@@ -1,12 +1,16 @@
 from setuptools import setup
 
+
 setup(
     name='aiogram dialog',
-    version='0.0.1a',
+    version='0.0.1a0',
     packages=['dialog'],
-    url='',
+    url='https://github.com/MaximZayats/aiogram-dialog',
     license='',
     author='Maxim',
     author_email='maximzayats1@gmail.com',
-    description=''
+    description='',
+    install_requires=[
+        'aiogram~=2.14.3',
+    ],
 )
