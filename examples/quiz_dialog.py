@@ -7,8 +7,8 @@ from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from aiogram.dispatcher import FSMContext
 from aiogram.types import Message as AiogramMessage, BotCommand, ReplyKeyboardRemove
 
-from dialog.dialog import Scene, Relation, Dialog, Router, FutureDialog
-from dialog.types import BaseMessage, EventType
+from dialog import Scene, Relation, Dialog, Router, FutureDialog
+from dialog.types import BaseMessage
 
 logging.basicConfig(level=logging.INFO)
 
@@ -80,7 +80,7 @@ class QuizUtils(Dialog):
         Relation(lambda *, current_scene: current_scene or QuizUtils.start_scene,
                  commands='start'),
         Relation(QuizUtils.score,
-                 is_game_started, commands='score', event_types=EventType.CALLBACK_QUERY),
+                 is_game_started, commands='score'),
         Relation(lambda *, current_scene: current_scene,
                  is_game_started, commands='repeat'),
         Relation(lambda *, previous_scene: previous_scene,
