@@ -16,7 +16,6 @@ from dialog.utils import run_function
 
 class _DialogMeta(type):
     def __new__(mcs, cls_name: str, superclasses: tuple, attributes: dict, **kwargs):
-        attributes[cls_name + '1'] = 1
         cls: 'Dialog' = super().__new__(mcs, cls_name, superclasses, attributes)  # type: ignore
 
         is_abstract = getattr(attributes.get('Meta', {}), 'abstract', False)
@@ -24,7 +23,7 @@ class _DialogMeta(type):
         if is_abstract:
             return cls
 
-        namespace = getattr(attributes.get('Meta', {}), 'namespace', None) or cls_name
+        namespace = getattr(attributes.get('Meta', {}), 'namespace', cls_name)
 
         for key, value in cls.__dict__.items():  # type: str, Any
             if isinstance(value, Scene):
