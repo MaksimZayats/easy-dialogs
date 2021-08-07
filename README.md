@@ -1,6 +1,10 @@
 ### About
 
-Aiogram-dialog is a framework for telegram bot.
+**Aiogram-dialog** is a framework for creating telegram bots.
+
+**Aiogram-dialog** facilitates the creation of relationships and transitions between scenes (states).
+
+Based on aiogram.
 
 ### Quickstart
 
