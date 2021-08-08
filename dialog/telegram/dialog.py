@@ -102,6 +102,7 @@ class BaseScenesStorage(ABC):
                              current_event_type: str,
                              handler_args: tuple,
                              handler_kwargs: dict) -> Optional['Scene']:
+        # TODO: refactor
         if current_scene:
             for relation in current_scene.relations:
                 next_scene = await relation.get_scene(*handler_args, **handler_kwargs)
@@ -109,6 +110,9 @@ class BaseScenesStorage(ABC):
                         await relation.check_filters(*handler_args,
                                                      event_type=current_event_type,
                                                      **handler_kwargs):
+                    for on_transition_function in relation.on_transition:
+                        await run_function(on_transition_function, *handler_args, **handler_kwargs)
+
                     return next_scene
 
         for router in Dialog._routers:  # NOQA
@@ -119,6 +123,9 @@ class BaseScenesStorage(ABC):
                         await relation.check_filters(*handler_args,
                                                      event_type=current_event_type,
                                                      **handler_kwargs):
+                    for on_transition_function in relation.on_transition:
+                        await run_function(on_transition_function, *handler_args, **handler_kwargs)
+
                     return next_scene
 
         return None
@@ -250,7 +257,8 @@ class ScenesStorage(BaseScenesStorage):
                                     chat_id: Union[int, str],
                                     user_id: Union[int, str],
                                     new_scenes_history: Sequence[str]) -> Sequence[str]:
-        await self.storage.update_data(**{self.data_key: new_scenes_history})
+        await self.storage.update_data(chat=chat_id, user=user_id,
+                                       **{self.data_key: new_scenes_history})
 
         return new_scenes_history
 
@@ -261,7 +269,11 @@ class ScenesStorage(BaseScenesStorage):
         data = await self.storage.get_data(chat=chat_id, user=user_id)
 
         scenes_history: List[str] = data.get(self.data_key, [])
-        scenes_history.append(new_scene.full_name)
+        try:
+            if scenes_history[-1] != new_scene.full_name:
+                scenes_history.append(new_scene.full_name)
+        except IndexError:
+            scenes_history.append(new_scene.full_name)
 
         await self.storage.update_data(
             chat=chat_id, user_id=user_id,
@@ -399,6 +411,7 @@ class Relation:
                            Callable[..., Union['Scene', Awaitable['Scene']]]],
                  *filters_as_args: Union[Callable[..., Union[bool, Awaitable[bool]]], AbstractFilter],
                  event_types: Union[str, Sequence[str]] = (EventType.MESSAGE,),
+                 on_transition: Union[Callable, Sequence[Callable]] = tuple(),
                  **filters_as_kwargs: Any
                  ):
 
@@ -427,6 +440,11 @@ class Relation:
             event_types = (event_types,)
 
         self.event_types = event_types
+
+        if isinstance(on_transition, Callable):
+            on_transition = (on_transition,)
+
+        self.on_transition = on_transition
 
         self.filters: Dict[str, List[Callable[..., Union[bool, Awaitable[bool]]]]] = dict()
 
