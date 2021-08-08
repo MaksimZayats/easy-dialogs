@@ -7,8 +7,8 @@ from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from aiogram.dispatcher import FSMContext
 from aiogram.types import Message as AiogramMessage, BotCommand, ReplyKeyboardRemove
 
-from dialog import Scene, Relation, Dialog, Router, FutureDialog
-from dialog.types import BaseMessage
+from dialog.telegram import Scene, Relation, Dialog, Router, FutureDialog
+from dialog.telegram.types import BaseMessage
 
 logging.basicConfig(level=logging.INFO)
 

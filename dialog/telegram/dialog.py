@@ -10,7 +10,7 @@ from aiogram.dispatcher.storage import BaseStorage
 from aiogram.types import Message as AiogramMessage, CallbackQuery
 from aiogram.types.base import TelegramObject
 
-from dialog.types import BaseMessage, EventType, FutureScene
+from .types import BaseMessage, EventType, FutureScene
 from dialog.utils import run_function
 
 
