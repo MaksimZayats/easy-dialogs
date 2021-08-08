@@ -57,6 +57,15 @@ class BaseScenesStorage(ABC):
         """
 
     @abstractmethod
+    async def update_scenes_history(self, *,
+                                    chat_id: Union[int, str],
+                                    user_id: Union[int, str],
+                                    new_scenes_history: Sequence[str]) -> Sequence[str]:
+        """
+        :returns: Scenes History
+        """
+
+    @abstractmethod
     async def set_current_scene(self, *,
                                 chat_id: Union[int, str],
                                 user_id: Union[int, str],
@@ -236,6 +245,14 @@ class ScenesStorage(BaseScenesStorage):
                                  user_id: Union[int, str]) -> List[str]:
         data = await self.storage.get_data(chat=chat_id, user=user_id)
         return data.get(self.data_key, [])
+
+    async def update_scenes_history(self, *,
+                                    chat_id: Union[int, str],
+                                    user_id: Union[int, str],
+                                    new_scenes_history: Sequence[str]) -> Sequence[str]:
+        await self.storage.update_data(**{self.data_key: new_scenes_history})
+
+        return new_scenes_history
 
     async def set_current_scene(self, *,
                                 chat_id: Union[int, str],
