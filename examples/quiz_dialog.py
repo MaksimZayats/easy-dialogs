@@ -52,6 +52,15 @@ async def process_incorrect_answer(message: AiogramMessage, state: FSMContext):
         await message.reply(f'<b>Incorrect! ❌</b>')
 
 
+async def process_move_to_previous_scene(message: AiogramMessage):
+    current_scenes_history = await Dialog.scenes_storage.get_scenes_history(chat_id=message.chat.id,
+                                                                            user_id=message.from_user.id)
+
+    await Dialog.scenes_storage.update_scenes_history(chat_id=message.chat.id,
+                                                      user_id=message.from_user.id,
+                                                      new_scenes_history=current_scenes_history[:-1])
+
+
 async def get_end_game_message(message: AiogramMessage, state: FSMContext) -> BaseMessage:
     data = await state.get_data()
 
@@ -84,7 +93,8 @@ class QuizUtils(Dialog):
         Relation(lambda *, current_scene: current_scene,
                  is_game_started, commands='repeat'),
         Relation(lambda *, previous_scene: previous_scene,
-                 is_game_started, commands='back'),
+                 is_game_started, commands='back',
+                 on_transition=process_move_to_previous_scene),
         Relation(QuizUtils.incorrect_answer, is_game_started),
         Relation(QuizUtils.game_is_not_started_scene, is_game_not_started)
     )
