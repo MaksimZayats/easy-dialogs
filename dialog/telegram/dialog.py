@@ -177,7 +177,7 @@ class Handler:
                 for key in Dialog.KEYS_FOR_NEXT_SCENES:
                     kwargs[key] = None
 
-            if next_scene.can_stay:
+            if next_scene.can_stay and current_scene != next_scene:
                 await Dialog.scenes_storage.set_current_scene(
                     chat_id=chat_id,
                     user_id=obj.from_user.id,
