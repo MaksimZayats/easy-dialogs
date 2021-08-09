@@ -3,7 +3,7 @@ from setuptools import setup
 
 setup(
     name='dialog',
-    version='0.0.1a0',
+    version='0.0.2a0',
     packages=['dialog'],
     url='https://github.com/MaximZayats/aiogram-dialog',
     license='',
