@@ -238,7 +238,7 @@ class View:
         return sent_messages
 
 
-class ScenesStorage(BaseScenesStorage):
+class AiogramBasedScenesStorage(BaseScenesStorage):
     def __init__(self,
                  aiogram_storage: BaseStorage,
                  data_key: str = 'scenes_history'):
@@ -579,7 +579,7 @@ class Dialog(metaclass=_DialogMeta):
     def register(cls,
                  dp: Dispatcher,
                  scenes_storage: Optional[BaseScenesStorage] = None):
-        cls.scenes_storage = scenes_storage or ScenesStorage(aiogram_storage=dp.storage)
+        cls.scenes_storage = scenes_storage or AiogramBasedScenesStorage(aiogram_storage=dp.storage)
         cls.init(dp)
 
         dp.register_message_handler(Handler(type_=EventType.MESSAGE))
