@@ -102,10 +102,8 @@ class BaseScenesStorage(ABC):
                              current_event_type: str,
                              handler_args: tuple,
                              handler_kwargs: dict) -> Optional['Scene']:
-        # TODO: refactor
         if current_scene:
             for relation in current_scene.relations:
-                next_scene = await relation.get_scene(*handler_args, **handler_kwargs)
                 if current_event_type in relation.event_types and \
                         await relation.check_filters(*handler_args,
                                                      event_type=current_event_type,
@@ -113,12 +111,10 @@ class BaseScenesStorage(ABC):
                     for on_transition_function in relation.on_transition:
                         await run_function(on_transition_function, *handler_args, **handler_kwargs)
 
-                    return next_scene
+                    return await relation.get_scene(*handler_args, **handler_kwargs)
 
         for router in Dialog._routers:  # NOQA
             for relation in router.relations:
-                next_scene = await relation.get_scene(*handler_args, **handler_kwargs)
-
                 if current_event_type in relation.event_types and \
                         await relation.check_filters(*handler_args,
                                                      event_type=current_event_type,
@@ -126,7 +122,7 @@ class BaseScenesStorage(ABC):
                     for on_transition_function in relation.on_transition:
                         await run_function(on_transition_function, *handler_args, **handler_kwargs)
 
-                    return next_scene
+                    return await relation.get_scene(*handler_args, **handler_kwargs)
 
         return None
 
