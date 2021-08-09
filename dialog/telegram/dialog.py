@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from copy import deepcopy
-from typing import Optional, Iterable, Union, Dict, Callable, \
+from typing import Optional, Union, Dict, Callable, \
     AsyncIterator, Any, List, Sequence, Set, Awaitable
 
 from aiogram import Dispatcher
@@ -10,8 +10,8 @@ from aiogram.dispatcher.storage import BaseStorage
 from aiogram.types import Message as AiogramMessage, CallbackQuery
 from aiogram.types.base import TelegramObject
 
-from .types import BaseMessage, EventType, FutureScene
 from dialog.utils import run_function
+from .types import BaseMessage, EventType, FutureScene
 
 
 class _DialogMeta(type):
@@ -290,11 +290,18 @@ class Scene:
 
                  messages: Union[
                      'BaseMessage', Sequence['BaseMessage'],
-                     Callable[..., Union['BaseMessage', Iterable['BaseMessage'],
-                                         Awaitable['BaseMessage'],
-                                         Iterable[Awaitable['BaseMessage']]]],
-                     Iterable[Callable[..., Union['BaseMessage', Sequence['BaseMessage']]]]
+
+                     Callable[..., 'BaseMessage'],
+                     Callable[..., Sequence['BaseMessage']],
+                     Callable[..., Awaitable['BaseMessage']],
+                     Callable[..., Sequence[Awaitable['BaseMessage']]],
+
+                     Sequence[Callable[..., 'BaseMessage']],
+                     Sequence[Callable[..., Sequence['BaseMessage']]],
+                     Sequence[Callable[..., Awaitable['BaseMessage']]],
+                     Sequence[Callable[..., Sequence[Awaitable['BaseMessage']]]]
                  ] = tuple(),
+
                  relations: Union['Relation', Sequence['Relation']] = tuple(),
 
                  view_function: Callable = View.send_new_message,
@@ -372,7 +379,7 @@ class Scene:
             if isinstance(message, BaseMessage):
                 yield message
             else:
-                messages: Union['BaseMessage', Iterable['BaseMessage']] = \
+                messages: Union['BaseMessage', Sequence['BaseMessage']] = \
                     await run_function(message, *args, **kwargs)
                 if isinstance(messages, BaseMessage):
                     yield messages
@@ -408,7 +415,8 @@ class Scene:
 class Relation:
     def __init__(self,
                  to: Union[Scene, str, FutureScene,
-                           Callable[..., Union['Scene', Awaitable['Scene']]]],
+                           Callable[..., 'Scene'],
+                           Callable[..., Awaitable['Scene']]],
                  *filters_as_args: Union[Callable[..., Union[bool, Awaitable[bool]]], AbstractFilter],
                  event_types: Union[str, Sequence[str]] = (EventType.MESSAGE,),
                  on_transition: Union[Callable, Sequence[Callable]] = tuple(),
@@ -421,20 +429,20 @@ class Relation:
             self.get_scene_func = None
             self.future_scene = None
         elif isinstance(to, FutureScene):
-            self.to_scene = None
-            self.to_scene_name = None
+            self.to_scene = None  # type: ignore
+            self.to_scene_name = None  # type: ignore
             self.get_scene_func = None
             self.future_scene = to
         elif isinstance(to, str):
-            self.to_scene: 'Scene' = None  # type: ignore
+            self.to_scene = None  # type: ignore
             self.to_scene_name = to
-            self.get_scene_func = None
-            self.future_scene = None
+            self.get_scene_func = None  # type: ignore
+            self.future_scene = None  # type: ignore
         elif isinstance(to, Callable):
-            self.to_scene = None
-            self.to_scene_name = None
+            self.to_scene = None  # type: ignore
+            self.to_scene_name = None  # type: ignore
             self.get_scene_func = to
-            self.future_scene = None
+            self.future_scene = None  # type: ignore
 
         if isinstance(event_types, str):
             event_types = (event_types,)
@@ -465,7 +473,7 @@ class Relation:
 
             _filters_as_kwargs = self._filters_as_kwargs.copy()
 
-            not_registered_filters = []
+            not_registered_filters: List[str] = []
 
             while True:
                 try:
@@ -539,7 +547,7 @@ class Router:
                  *relations: 'Relation',
                  namespace: Optional[str] = None):
         self.relations = relations
-        self.namespace = namespace  # Will be updated by `DialogMeta`
+        self.namespace: str = namespace  # type: ignore
 
     def init(self, dp: Optional[Dispatcher] = None):
         Dialog._routers.add(self)  # NOQA

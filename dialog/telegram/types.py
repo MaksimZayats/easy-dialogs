@@ -12,7 +12,7 @@ from dialog.utils import is_url
 class BaseMessage:
     text: Optional[str] = None
 
-    attachment_type: Optional[Union[str, 'AttachmentType']] = None
+    attachment_type: Optional[str] = None
     attachments: Optional[Sequence[str]] = None
 
     keyboard: Optional[Union[ReplyKeyboardMarkup,
@@ -110,7 +110,7 @@ class BaseMessage:
 
 @dataclass
 class FutureScene:
-    class_name: str
+    class_name: Optional[str]
     scene_name: str
 
 

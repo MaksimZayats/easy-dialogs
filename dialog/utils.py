@@ -1,5 +1,5 @@
 from inspect import getfullargspec, FullArgSpec
-from typing import Callable, Any, TypeVar, Union
+from typing import Callable, Any, TypeVar, Union, Sequence, Tuple, List, Iterable
 from typing import Coroutine
 
 
@@ -10,7 +10,7 @@ async def run_function(function: Union[Callable[..., Coroutine[Any, Any, T]],
                                        Callable[..., T]],
                        *args, **kwargs) -> T:
     try:
-        function_spec: FullArgSpec = function.full_arg_spec  # NOQA
+        function_spec: FullArgSpec = function.full_arg_spec  # type: ignore
     except AttributeError:
         function_spec = getfullargspec(getattr(function, '__wrapped__', function))
         function.__dict__['full_arg_spec'] = function_spec
@@ -26,7 +26,7 @@ async def run_function(function: Union[Callable[..., Coroutine[Any, Any, T]],
     if isinstance(result, Coroutine):
         result = await result
 
-    return result
+    return result  # type: ignore
 
 
 def check_spec(spec: FullArgSpec, kwargs: dict) -> dict:
