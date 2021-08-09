@@ -39,7 +39,9 @@ class _DialogMeta(type):
             elif isinstance(value, Router):
                 router = value
 
-                router.namespace = namespace
+                if not router.namespace:
+                    router.namespace = namespace
+
                 cls._routers.add(router)
 
         cls._init_dialogs[cls_name] = cls
