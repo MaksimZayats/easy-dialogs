@@ -1,10 +1,10 @@
-from setuptools import setup
+from setuptools import setup, find_packages
 
 
 setup(
     name='dialog',
     version='0.0.2a0',
-    packages=['dialog'],
+    packages=find_packages(where='dialog'),
     url='https://github.com/MaximZayats/aiogram-dialog',
     license='',
     author='Maxim',
