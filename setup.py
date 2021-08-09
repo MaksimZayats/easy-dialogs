@@ -5,6 +5,7 @@ setup(
     name='dialog',
     version='0.0.2a0',
     packages=find_packages(where='dialog'),
+    package_dir={'': 'dialog'},
     url='https://github.com/MaximZayats/aiogram-dialog',
     license='',
     author='Maxim',
