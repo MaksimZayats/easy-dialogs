@@ -35,14 +35,14 @@ class _DialogMeta(type):
                 if not scene.namespace:
                     scene.namespace = namespace
 
-                cls._scenes[scene.full_name] = scene
+                scene.register()
             elif isinstance(value, Router):
                 router = value
 
                 if not router.namespace:
                     router.namespace = namespace
 
-                cls._routers.add(router)
+                router.register()
 
         cls._init_dialogs[cls_name] = cls
 
@@ -359,15 +359,16 @@ class Scene:
         """
         return f'{self.namespace}.{self.name}'
 
-    def init(self, dp: Optional[Dispatcher] = None) -> None:
+    def register(self) -> None:
         if not self.name:
-            raise ValueError(f"Can't initialize scene without name")
+            raise ValueError("Can't register scene without name")
 
         if not self.namespace:
-            raise ValueError(f"Can't initialize scene without namespace")
+            raise ValueError("Can't register scene without namespace")
 
         Dialog._scenes[self.full_name] = self  # NOQA
 
+    def init(self, dp: Optional[Dispatcher] = None) -> None:
         for relation in self.relations:
             relation.init_scene(namespace=self.namespace)
             relation.init_filters(dp=dp)
@@ -547,9 +548,10 @@ class Router:
         self.relations = relations
         self.namespace: str = namespace  # type: ignore
 
-    def init(self, dp: Optional[Dispatcher] = None):
+    def register(self):
         Dialog._routers.add(self)  # NOQA
 
+    def init(self, dp: Optional[Dispatcher] = None):
         for relation in self.relations:
             relation.init_scene(namespace=self.namespace)
             relation.init_filters(dp)
