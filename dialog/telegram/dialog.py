@@ -155,11 +155,17 @@ class Handler:
         obj: Union[AiogramMessage, CallbackQuery, TelegramObject] = args[0]
 
         try:
+            user_id = obj.from_user.id
+        except AttributeError:
+            user_id = obj.user.id  # NOQA
+
+        try:
             chat_id = obj.chat.id
         except AttributeError:
-            chat_id = obj.message.chat.id
-
-        user_id = obj.from_user.id
+            try:
+                chat_id = obj.message.chat.id
+            except AttributeError:
+                chat_id = user_id
 
         previous_scene = await Dialog.scenes_storage.get_previous_scene(user_id=user_id, chat_id=chat_id)
         current_scene = await Dialog.scenes_storage.get_current_scene(user_id=user_id, chat_id=chat_id)
@@ -193,7 +199,7 @@ class Handler:
 
             if next_scene.can_stay and current_scene != next_scene:
                 await Dialog.scenes_storage.set_current_scene(
-                    chat_id=chat_id, user_id=obj.from_user.id, new_scene=next_scene)
+                    chat_id=chat_id, user_id=user_id, new_scene=next_scene)
 
             for key in Dialog.KEYS_FOR_PREVIOUS_SCENES:
                 kwargs[key] = current_scene
@@ -220,9 +226,17 @@ class View:
         sent_messages: List[AiogramMessage] = []
 
         try:
+            user_id = obj.from_user.id
+        except AttributeError:
+            user_id = obj.user.id  # NOQA
+
+        try:
             chat_id = obj.chat.id
         except AttributeError:
-            chat_id = obj.message.chat.id
+            try:
+                chat_id = obj.message.chat.id
+            except AttributeError:
+                chat_id = user_id
 
         scene: 'Scene' = kwargs.get(Dialog.KEYS_FOR_CURRENT_SCENES[0])
 
@@ -589,21 +603,22 @@ class Dialog(metaclass=_DialogMeta):
     @classmethod
     def register(cls,
                  dp: Dispatcher,
-                 scenes_storage: Optional[BaseScenesStorage] = None):
+                 scenes_storage: Optional[BaseScenesStorage] = None,
+                 handler: Callable[..., Callable[..., Awaitable]] = Handler):
         cls.scenes_storage = scenes_storage or AiogramBasedScenesStorage(aiogram_storage=dp.storage)
         cls.init(dp)
 
-        dp.register_message_handler(Handler(type_=EventType.MESSAGE))
-        dp.register_callback_query_handler(Handler(type_=EventType.CALLBACK_QUERY))
-        dp.register_poll_handler(Handler(type_=EventType.POLL))
-        dp.register_poll_answer_handler(Handler(type_=EventType.POLL_ANSWER))
-        dp.register_channel_post_handler(Handler(type_=EventType.CHANNEL_POST))
-        dp.register_chat_member_handler(Handler(type_=EventType.CHAT_MEMBER))
-        dp.register_chosen_inline_handler(Handler(type_=EventType.CHOSEN_INLINE_RESULT))
-        dp.register_edited_message_handler(Handler(type_=EventType.EDITED_MESSAGE))
-        dp.register_pre_checkout_query_handler(Handler(type_=EventType.PRE_CHECKOUT_QUERY))
-        dp.register_shipping_query_handler(Handler(type_=EventType.SHIPPING_QUERY))
-        dp.register_my_chat_member_handler(Handler(type_=EventType.MY_CHAT_MEMBER))
+        dp.register_message_handler(handler(type_=EventType.MESSAGE))
+        dp.register_callback_query_handler(handler(type_=EventType.CALLBACK_QUERY))
+        dp.register_poll_handler(handler(type_=EventType.POLL))
+        dp.register_poll_answer_handler(handler(type_=EventType.POLL_ANSWER))
+        dp.register_channel_post_handler(handler(type_=EventType.CHANNEL_POST))
+        dp.register_chat_member_handler(handler(type_=EventType.CHAT_MEMBER))
+        dp.register_chosen_inline_handler(handler(type_=EventType.CHOSEN_INLINE_RESULT))
+        dp.register_edited_message_handler(handler(type_=EventType.EDITED_MESSAGE))
+        dp.register_pre_checkout_query_handler(handler(type_=EventType.PRE_CHECKOUT_QUERY))
+        dp.register_shipping_query_handler(handler(type_=EventType.SHIPPING_QUERY))
+        dp.register_my_chat_member_handler(handler(type_=EventType.MY_CHAT_MEMBER))
 
         # TODO: register all Events
 
