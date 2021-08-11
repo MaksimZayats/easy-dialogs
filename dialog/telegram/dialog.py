@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from copy import deepcopy
 from typing import Optional, Union, Dict, Callable, \
-    AsyncIterator, Any, List, Sequence, Set, Awaitable
+    AsyncIterator, Any, List, Sequence, Set, Awaitable, Type
 
 from aiogram import Dispatcher
 from aiogram.dispatcher.filters import AbstractFilter
@@ -16,7 +16,7 @@ from .types import BaseMessage, CustomMessage, EventType, FutureScene
 
 class _DialogMeta(type):
     def __new__(mcs, cls_name: str, superclasses: tuple, attributes: dict, **kwargs):
-        cls: 'Dialog' = super().__new__(mcs, cls_name, superclasses, attributes)  # type: ignore
+        cls: Type['Dialog'] = super().__new__(mcs, cls_name, superclasses, attributes)  # type: ignore
 
         is_abstract = getattr(attributes.get('Meta', {}), 'abstract', False)
 
@@ -44,9 +44,21 @@ class _DialogMeta(type):
 
                 router.register()
 
-        cls._init_dialogs[cls_name] = cls
+        cls.register_dialog(dialog=cls)
 
         return cls
+
+    @property
+    def initialized_scenes(cls: Type['Dialog']) -> Dict[str, 'Scene']:
+        return cls._initialized_scenes
+
+    @property
+    def initialized_routers(cls: Type['Dialog']) -> Set['Router']:
+        return cls._initialized_routers
+
+    @property
+    def initialized_dialogs(cls: Type['Dialog']) -> Dict[str, Type['Dialog']]:
+        return cls._initialized_dialogs
 
 
 class BaseScenesStorage(ABC):
@@ -84,7 +96,7 @@ class BaseScenesStorage(ABC):
         scene_ids = await self.get_scenes_history(user_id=user_id, chat_id=chat_id)
 
         if scene_ids:
-            return Dialog._scenes.get(scene_ids[-1], None)  # NOQA
+            return Dialog.initialized_scenes.get(scene_ids[-1], None)
         else:
             return None
 
@@ -94,7 +106,7 @@ class BaseScenesStorage(ABC):
         scenes_history = await self.get_scenes_history(chat_id=chat_id, user_id=user_id)
 
         try:
-            return Dialog._scenes[scenes_history[-2]]  # NOQA
+            return Dialog.initialized_scenes[scenes_history[-2]]
         except IndexError:
             return None
 
@@ -115,7 +127,7 @@ class BaseScenesStorage(ABC):
 
                     return await relation.get_scene(*handler_args, **handler_kwargs)
 
-        for router in Dialog._routers:  # NOQA
+        for router in Dialog.initialized_routers:
             for relation in router.relations:
                 if current_event_type in relation.event_types and \
                         await relation.check_filters(*handler_args,
@@ -374,12 +386,12 @@ class Scene:
 
     def register(self) -> None:
         if not self.name:
-            raise ValueError("Can't register scene without name")
+            raise ValueError("Can't register `Scene` without name")
 
         if not self.namespace:
-            raise ValueError("Can't register scene without namespace")
+            raise ValueError("Can't register `Scene` without namespace")
 
-        Dialog._scenes[self.full_name] = self  # NOQA
+        Dialog.register_scene(scene=self)
 
     def init(self, dp: Optional[Dispatcher] = None) -> None:
         for relation in self.relations:
@@ -518,7 +530,7 @@ class Relation:
             if self.to_scene_name.count('.') == 0:
                 self.to_scene_name = f"{namespace}.{self.to_scene_name}"
             try:
-                self.to_scene = Dialog._scenes[self.to_scene_name]  # NOQA
+                self.to_scene = Dialog.initialized_scenes[self.to_scene_name]
             except KeyError:
                 raise RuntimeError(f'Scene "{self.to_scene_name}" not found')
         elif self.to_scene:
@@ -531,13 +543,13 @@ class Relation:
                     self.to_scene_name = self.future_scene.scene_name
 
                 try:
-                    self.to_scene = Dialog._scenes[self.to_scene_name]  # NOQA
+                    self.to_scene = Dialog.initialized_scenes[self.to_scene_name]
                 except KeyError:
                     raise RuntimeError(f'Scene "{self.to_scene_name}" not found')
 
                 return
 
-            cls = Dialog._init_dialogs.get(self.future_scene.class_name)  # NOQA
+            cls = Dialog.initialized_dialogs.get(self.future_scene.class_name)
 
             if cls is None:
                 raise RuntimeError(f'Class "{self.future_scene.class_name}" for "FutureScene" not found!')
@@ -572,7 +584,10 @@ class Router:
         self.namespace: str = namespace  # type: ignore
 
     def register(self):
-        Dialog._routers.add(self)  # NOQA
+        if self.namespace is None:
+            raise ValueError("Can't register `Router` without namespace")
+
+        Dialog.register_router(router=self)
 
     def init(self, dp: Optional[Dispatcher] = None):
         for relation in self.relations:
@@ -583,9 +598,9 @@ class Router:
 class Dialog(metaclass=_DialogMeta):
     scenes_storage: BaseScenesStorage = NotImplemented  # type: ignore
 
-    _init_dialogs: Dict[str, 'Dialog'] = dict()  # Dict[class_name, 'Dialog']
-    _scenes: Dict[str, 'Scene'] = dict()  # Dict[Scene.full_name, Scene]
-    _routers: Set['Router'] = set()
+    _initialized_dialogs: Dict[str, Type['Dialog']] = dict()  # Dict[class_name, Type['Dialog']]
+    _initialized_scenes: Dict[str, 'Scene'] = dict()  # Dict[Scene.full_name, Scene]
+    _initialized_routers: Set['Router'] = set()
 
     # Configuration
     KEYS_FOR_PREVIOUS_SCENES: Sequence[str] = ('previous_scene',)
@@ -594,10 +609,10 @@ class Dialog(metaclass=_DialogMeta):
 
     @classmethod
     def init(cls, dp: Optional[Dispatcher] = None):
-        for scene in cls._scenes.values():
+        for scene in cls.initialized_scenes.values():
             scene.init(dp=dp)
 
-        for router in cls._routers:
+        for router in cls.initialized_routers:
             router.init(dp=dp)
 
     @classmethod
@@ -621,6 +636,18 @@ class Dialog(metaclass=_DialogMeta):
         dp.register_my_chat_member_handler(handler(type_=EventType.MY_CHAT_MEMBER))
 
         # TODO: register all Events
+
+    @classmethod
+    def register_scene(cls, scene: Scene):
+        cls._initialized_scenes[scene.full_name] = scene
+
+    @classmethod
+    def register_router(cls, router: Router):
+        cls._initialized_routers.add(router)
+
+    @classmethod
+    def register_dialog(cls, dialog: Type['Dialog']):
+        cls._initialized_dialogs[dialog.__name__] = dialog
 
     class Meta:
         """
