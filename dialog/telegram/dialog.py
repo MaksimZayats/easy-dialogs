@@ -11,7 +11,7 @@ from aiogram.types import Message as AiogramMessage, CallbackQuery
 from aiogram.types.base import TelegramObject
 
 from dialog.utils import run_function
-from .types import BaseMessage, EventType, FutureScene
+from .types import BaseMessage, CustomMessage, EventType, FutureScene
 
 
 class _DialogMeta(type):
@@ -134,6 +134,7 @@ class FutureDialog:
     Used to create a link to a dialog that has not yet been initialized.
     Can only be used to create scene relation.
     """
+
     def __init__(self, class_name: Optional[str] = None):
         self.class_name = class_name
 
@@ -219,7 +220,7 @@ class View:
     async def send_new_message(*args, **kwargs) -> List[AiogramMessage]:
         obj: Union[AiogramMessage, CallbackQuery, TelegramObject] = args[0]
 
-        sent_messages = []
+        sent_messages: List[AiogramMessage] = []
 
         try:
             chat_id = obj.chat.id
@@ -229,7 +230,7 @@ class View:
         scene: 'Scene' = kwargs.get(Dialog.KEYS_FOR_CURRENT_SCENES[0])
 
         async for message_to_send in scene.get_messages(*args, **kwargs):
-            sent_message = await message_to_send.send(chat_id=chat_id, bot=obj.bot)
+            sent_message = await message_to_send.send(chat_id=chat_id)
             sent_messages.append(sent_message)
 
         if isinstance(obj, CallbackQuery):
@@ -287,17 +288,18 @@ class Scene:
                  namespace: Optional[str] = None,
 
                  messages: Union[
-                     'BaseMessage', Sequence['BaseMessage'],
+                     'BaseMessage', CustomMessage,
+                     Sequence[Union[CustomMessage, 'BaseMessage']],
 
-                     Callable[..., 'BaseMessage'],
-                     Callable[..., Sequence['BaseMessage']],
-                     Callable[..., Awaitable['BaseMessage']],
-                     Callable[..., Sequence[Awaitable['BaseMessage']]],
+                     Callable[..., Union[CustomMessage, 'BaseMessage']],
+                     Callable[..., Sequence[Union[CustomMessage, 'BaseMessage']]],
+                     Callable[..., Awaitable[Union[CustomMessage, 'BaseMessage']]],
+                     Callable[..., Sequence[Awaitable[Union[CustomMessage, 'BaseMessage']]]],
 
-                     Sequence[Callable[..., 'BaseMessage']],
-                     Sequence[Callable[..., Sequence['BaseMessage']]],
-                     Sequence[Callable[..., Awaitable['BaseMessage']]],
-                     Sequence[Callable[..., Sequence[Awaitable['BaseMessage']]]]
+                     Sequence[Callable[..., Union[CustomMessage, 'BaseMessage']]],
+                     Sequence[Callable[..., Sequence[Union[CustomMessage, 'BaseMessage']]]],
+                     Sequence[Callable[..., Awaitable[Union[CustomMessage, 'BaseMessage']]]],
+                     Sequence[Callable[..., Sequence[Awaitable[Union[CustomMessage, 'BaseMessage']]]]]
                  ] = tuple(),
 
                  relations: Union['Relation', Sequence['Relation']] = tuple(),
@@ -316,7 +318,7 @@ class Scene:
         self.name: str = name  # Will be updated by `DialogMeta`
         self.namespace: str = namespace  # Will be updated by `DialogMeta`
 
-        if isinstance(messages, BaseMessage) or isinstance(messages, Callable):
+        if isinstance(messages, (BaseMessage, CustomMessage)) or isinstance(messages, Callable):
             messages = (messages,)
         if isinstance(relations, Relation):
             relations = (relations,)
@@ -373,18 +375,28 @@ class Scene:
             relation.init_scene(namespace=self.namespace)
             relation.init_filters(dp=dp)
 
-    async def get_messages(self, *args, **kwargs) -> AsyncIterator['BaseMessage']:
+    async def get_messages(self, *args, **kwargs) -> AsyncIterator[CustomMessage]:
         for message in self.messages:
             if isinstance(message, BaseMessage):
+                for aiogram_message in message.custom_messages:
+                    yield aiogram_message
+            elif isinstance(message, CustomMessage):
                 yield message
             else:
-                messages: Union['BaseMessage', Sequence['BaseMessage']] = \
+                messages: Union[BaseMessage, CustomMessage, Sequence[Union[BaseMessage, CustomMessage]]] = \
                     await run_function(message, *args, **kwargs)
                 if isinstance(messages, BaseMessage):
+                    for aiogram_message in messages.custom_messages:
+                        yield aiogram_message
+                elif isinstance(messages, CustomMessage):
                     yield messages
                 else:
                     for _message in messages:
-                        yield _message
+                        if isinstance(_message, BaseMessage):
+                            for aiogram_message in _message.custom_messages:
+                                yield aiogram_message
+                        elif isinstance(_message, CustomMessage):
+                            yield _message
 
     def _pre_view(self, view: Callable):
         async def wrapper(*args, **kwargs):

@@ -1,5 +1,6 @@
 from dataclasses import dataclass
-from typing import Optional, Union, Sequence, Callable
+from functools import cached_property
+from typing import Optional, Union, Sequence, Callable, List
 
 from aiogram import Bot
 from aiogram.types import ReplyKeyboardMarkup, InlineKeyboardMarkup, ReplyKeyboardRemove, \
@@ -19,48 +20,35 @@ class BaseMessage:
                              InlineKeyboardMarkup,
                              ReplyKeyboardRemove]] = None
 
-    async def send(self,
-                   chat_id: Union[str, int],
-                   bot: Optional[Bot] = None,
-                   **kwargs) -> Union[AiogramMessage, Sequence[AiogramMessage]]:
-        bot = bot or Bot.get_current()
+    def __post_init__(self):
+        self.custom_messages = self.get_custom_messages()
 
-        # ? Add limiter ?
+    def get_custom_messages(self) -> List['CustomMessage']:
+        custom_messages = []
 
         if self.attachment_type and self.attachments:
             if len(self.attachments) > 1:
                 if self.attachment_type == AttachmentType.STICKER:
-                    sent_messages = []
-
                     if self.text:
-                        sent_messages.append(await bot.send_message(chat_id, self.text, **kwargs))
+                        custom_messages.append(CustomMessage(text=self.text))
 
                     for attachment in self.attachments[:-1]:
-                        sent_messages.append(await bot.send_sticker(chat_id, attachment, **kwargs))
+                        custom_messages.append(CustomMessage(sticker=attachment))
 
-                    sent_messages.append(
-                        await bot.send_sticker(
-                            chat_id, self.attachments[-1],
-                            reply_markup=self.keyboard, **kwargs))
+                    custom_messages.append(CustomMessage(sticker=self.attachments[-1],
+                                                         reply_markup=self.keyboard))
 
-                    return sent_messages
                 elif self.attachment_type == AttachmentType.ANIMATION:
-                    sent_messages = []
-
                     for attachment in self.attachments[:-1]:
-                        sent_messages.append(
-                            await bot.send_animation(chat_id, attachment, **kwargs))
+                        custom_messages.append(CustomMessage(animation=attachment))
 
-                    sent_messages.append(
-                        await bot.send_animation(
-                            chat_id, self.attachments[-1],
-                            caption=self.text, reply_markup=self.keyboard, **kwargs))
-
-                    return sent_messages
+                    custom_messages.append(CustomMessage(animation=self.attachments[-1],
+                                                         caption=self.text,
+                                                         reply_markup=self.keyboard))
                 else:
                     """Если вложений > 1. Отправка медиа группы"""
                     media_group = MediaGroup()
-                    attach_method: Callable =\
+                    attach_method: Callable = \
                         getattr(media_group, f'attach_{self.attachment_type.lower()}', None)
 
                     if attach_method is None:
@@ -77,35 +65,79 @@ class BaseMessage:
                         else:
                             attach_method(InputFile(path_or_bytesio=attachment))
 
-                    return await bot.send_media_group(
-                        chat_id=chat_id, media=media_group, **kwargs)
+                    custom_messages.append(CustomMessage(media=media_group))
+
             else:
-                send_method: Callable = \
-                    getattr(bot, f'send_{self.attachment_type.lower()}', None)
-
-                if send_method is None:
-                    raise ValueError(f'{self.attachment_type} is unavailable media type')
-
                 if self.attachment_type == AttachmentType.STICKER:
                     if self.text:
-                        return (
-                            await bot.send_message(chat_id, self.text, **kwargs),
-                            await send_method(
-                                chat_id, self.attachments[0],
-                                reply_markup=self.keyboard, **kwargs)
-                        )
-                    else:
-                        return await send_method(
-                            chat_id, self.attachments[0],
-                            reply_markup=self.keyboard, **kwargs)
+                        custom_messages.append(CustomMessage(text=self.text))
+
+                    custom_messages.append(CustomMessage(sticker=self.attachments[0],
+                                                         reply_markup=self.keyboard))
                 else:
-                    return await send_method(
-                        chat_id, self.attachments[0],
-                        caption=self.text, reply_markup=self.keyboard, **kwargs)
+                    custom_messages.append(CustomMessage(
+                        **{self.attachment_type.lower(): self.attachments[0]},
+                        caption=self.text, reply_markup=self.keyboard))
         else:
-            return await bot.send_message(
-                chat_id, self.text,
-                reply_markup=self.keyboard, **kwargs)
+            custom_messages.append(CustomMessage(text=self.text, reply_markup=self.keyboard))
+
+        return custom_messages
+
+
+class CustomMessage:
+    def __init__(self,
+                 send_method: Optional[Callable] = None,  # AutoDetect
+                 **message_kwargs):
+        self.message_kwargs = message_kwargs
+        self._send_method = send_method
+
+    @cached_property
+    def send_method(self) -> Callable:
+        if self._send_method is not None:
+            return self._send_method
+
+        bot = Bot.get_current()
+
+        if 'text' in self.message_kwargs:
+            return bot.send_message
+        elif 'audio' in self.message_kwargs:
+            return bot.send_audio
+        elif 'animation' in self.message_kwargs:
+            return bot.send_animation
+        elif 'document' in self.message_kwargs:
+            return bot.send_document
+        elif 'photo' in self.message_kwargs:
+            return bot.send_photo
+        elif 'sticker' in self.message_kwargs:
+            return bot.send_sticker
+        elif 'video' in self.message_kwargs:
+            return bot.send_video
+        elif 'video_note' in self.message_kwargs:
+            return bot.send_video_note
+        elif 'voice' in self.message_kwargs:
+            return bot.send_voice
+        elif 'phone_number' in self.message_kwargs:
+            return bot.send_contact
+        elif not {'latitude', 'longitude', 'title', 'address'} - set(self.message_kwargs):
+            return bot.send_venue
+        elif 'latitude' in self.message_kwargs:
+            return bot.send_location
+        elif not {'question', 'options'} - set(self.message_kwargs):
+            return bot.send_poll
+        elif 'emoji' in self.message_kwargs:
+            return bot.send_dice
+        elif 'game_short_name' in self.message_kwargs:
+            return bot.send_game
+        elif not {'title', 'description', 'payload', 'provider_token', 'currency', 'prices'} - \
+                set(self.message_kwargs):
+            return bot.send_invoice
+        elif 'game_short_name' in self.message_kwargs:
+            return bot.send_game
+        elif 'media' in self.message_kwargs:
+            return bot.send_media_group
+
+    async def send(self, chat_id: Union[str, int]) -> AiogramMessage:
+        return await self.send_method(chat_id=chat_id, **self.message_kwargs)
 
 
 @dataclass
