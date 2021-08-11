@@ -148,8 +148,8 @@ class Handler:
 
     async def __call__(self, *args, **kwargs):
         """
-        Является функций-маршрутизатором.
-        Перенаправляет полученный апдейт в нужную сцену.
+        It is a function-router.
+        Redirects the received update to the desired scene.
         """
 
         obj: Union[AiogramMessage, CallbackQuery, TelegramObject] = args[0]
@@ -175,8 +175,7 @@ class Handler:
                 kwargs[key] = None
 
             next_scene = await Dialog.scenes_storage.get_next_scene(
-                current_scene=current_scene,
-                current_event_type=self._type,
+                current_scene=current_scene, current_event_type=self._type,
                 handler_args=args, handler_kwargs=kwargs)
 
             if next_scene is None:
@@ -194,9 +193,7 @@ class Handler:
 
             if next_scene.can_stay and current_scene != next_scene:
                 await Dialog.scenes_storage.set_current_scene(
-                    chat_id=chat_id,
-                    user_id=obj.from_user.id,
-                    new_scene=next_scene)
+                    chat_id=chat_id, user_id=obj.from_user.id, new_scene=next_scene)
 
             for key in Dialog.KEYS_FOR_PREVIOUS_SCENES:
                 kwargs[key] = current_scene
@@ -318,7 +315,7 @@ class Scene:
         self.name: str = name  # Will be updated by `DialogMeta`
         self.namespace: str = namespace  # Will be updated by `DialogMeta`
 
-        if isinstance(messages, (BaseMessage, CustomMessage)) or isinstance(messages, Callable):
+        if isinstance(messages, (BaseMessage, CustomMessage, Callable)):
             messages = (messages,)
         if isinstance(relations, Relation):
             relations = (relations,)

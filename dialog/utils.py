@@ -1,5 +1,5 @@
 from inspect import getfullargspec, FullArgSpec
-from typing import Callable, Any, TypeVar, Union, Sequence, Tuple, List, Iterable
+from typing import Callable, Any, TypeVar, Union
 from typing import Coroutine
 
 
