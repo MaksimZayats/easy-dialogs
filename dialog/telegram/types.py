@@ -1,10 +1,11 @@
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Optional, Union, Sequence, Callable, Tuple
+from typing import Callable, Optional, Sequence, Tuple, Union
 
 from aiogram import Bot
-from aiogram.types import ReplyKeyboardMarkup, InlineKeyboardMarkup, ReplyKeyboardRemove, \
-    Message as AiogramMessage, MediaGroup, InputFile
+from aiogram.types import InlineKeyboardMarkup, InputFile, MediaGroup
+from aiogram.types import Message as AiogramMessage
+from aiogram.types import ReplyKeyboardMarkup, ReplyKeyboardRemove
 
 from dialog import bases
 from dialog.utils import is_url

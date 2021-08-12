@@ -1,16 +1,16 @@
-from typing import Optional, Union, Callable, \
-    Any, List, Sequence, Awaitable
+from typing import Any, Awaitable, Callable, List, Optional, Sequence, Union
 
 from aiogram import Dispatcher
 from aiogram.dispatcher.filters import AbstractFilter
 from aiogram.dispatcher.handler import SkipHandler
 from aiogram.dispatcher.storage import BaseStorage
-from aiogram.types import Message as AiogramMessage, CallbackQuery
+from aiogram.types import CallbackQuery
+from aiogram.types import Message as AiogramMessage
 from aiogram.types.base import TelegramObject
 
-from dialog import bases
-from dialog import defaults
+from dialog import bases, defaults
 from dialog.utils import run_function
+
 from .types import EventType
 
 

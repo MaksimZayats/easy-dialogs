@@ -1,15 +1,18 @@
 import asyncio
 import logging
-from typing import Type, Optional
+from typing import Optional, Type
 
 from aiogram import Bot, Dispatcher
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from aiogram.dispatcher import FSMContext
-from aiogram.types import Message as AiogramMessage, BotCommand, ReplyKeyboardRemove
+from aiogram.types import BotCommand
+from aiogram.types import Message as AiogramMessage
+from aiogram.types import ReplyKeyboardRemove
 
 from dialog.defaults import FutureDialog
-from dialog.telegram import Scene, Relation, Dialog, Router
+from dialog.telegram import Dialog, Relation, Router, Scene
 from dialog.telegram.types import Message
+
 
 logging.basicConfig(level=logging.INFO)
 

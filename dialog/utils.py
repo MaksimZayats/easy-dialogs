@@ -1,6 +1,5 @@
-from inspect import getfullargspec, FullArgSpec
-from typing import Callable, Any, TypeVar, Union
-from typing import Coroutine
+from inspect import FullArgSpec, getfullargspec
+from typing import Any, Callable, Coroutine, TypeVar, Union
 
 
 T = TypeVar('T')

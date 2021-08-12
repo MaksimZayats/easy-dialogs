@@ -1,1 +1,2 @@
-from .dialog import Handler, View, Scene, Relation, Router, Dialog, AiogramBasedScenesStorage
+from .dialog import (AiogramBasedScenesStorage, Dialog, Handler, Relation,
+                     Router, Scene, View)
