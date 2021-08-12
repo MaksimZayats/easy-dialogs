@@ -49,15 +49,15 @@ class _DialogMeta(type):
         return cls
 
     @property
-    def initialized_scenes(cls: Type['Dialog']) -> Dict[str, 'Scene']:
+    def initialized_scenes(cls: Type['Dialog']) -> Dict[str, 'Scene']:  # type: ignore
         return cls._initialized_scenes
 
     @property
-    def initialized_routers(cls: Type['Dialog']) -> Set['Router']:
+    def initialized_routers(cls: Type['Dialog']) -> Set['Router']:  # type: ignore
         return cls._initialized_routers
 
     @property
-    def initialized_dialogs(cls: Type['Dialog']) -> Dict[str, Type['Dialog']]:
+    def initialized_dialogs(cls: Type['Dialog']) -> Dict[str, Type['Dialog']]:  # type: ignore
         return cls._initialized_dialogs
 
 
@@ -119,9 +119,8 @@ class BaseScenesStorage(ABC):
         if current_scene:
             for relation in current_scene.relations:
                 if current_event_type in relation.event_types and \
-                        await relation.check_filters(*handler_args,
-                                                     event_type=current_event_type,
-                                                     **handler_kwargs):
+                        await relation.check_filters(
+                            *handler_args, event_type=current_event_type, **handler_kwargs):
                     for on_transition_function in relation.on_transition:
                         await run_function(on_transition_function, *handler_args, **handler_kwargs)
 
@@ -130,9 +129,8 @@ class BaseScenesStorage(ABC):
         for router in Dialog.initialized_routers:
             for relation in router.relations:
                 if current_event_type in relation.event_types and \
-                        await relation.check_filters(*handler_args,
-                                                     event_type=current_event_type,
-                                                     **handler_kwargs):
+                        await relation.check_filters(
+                            *handler_args, event_type=current_event_type, **handler_kwargs):
                     for on_transition_function in relation.on_transition:
                         await run_function(on_transition_function, *handler_args, **handler_kwargs)
 
@@ -338,8 +336,8 @@ class Scene:
                  can_stay: bool = True,
                  custom_kwargs: Optional[dict] = None,
                  ):
-        self.name: str = name  # Will be updated by `DialogMeta`
-        self.namespace: str = namespace  # Will be updated by `DialogMeta`
+        self.name = name  # Will be updated by `DialogMeta`
+        self.namespace = namespace  # Will be updated by `DialogMeta`
 
         if isinstance(messages, (BaseMessage, CustomMessage, Callable)):
             messages = (messages,)
