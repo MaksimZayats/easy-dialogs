@@ -1,4 +1,5 @@
-from typing import Any, Awaitable, Callable, List, Optional, Sequence, Union
+from typing import (Any, Awaitable, Callable, List, Optional, Sequence, Type,
+                    Union)
 
 from aiogram import Dispatcher
 from aiogram.dispatcher.filters import AbstractFilter
@@ -232,7 +233,7 @@ class Dialog(bases.BaseDialog):
     def register(cls,
                  dp: Dispatcher,
                  scenes_storage: Optional[bases.BaseScenesStorage] = None,
-                 handler: Callable[..., Callable[..., Awaitable]] = Handler):
+                 handler: Type[bases.BaseHandler] = Handler):
         cls.scenes_storage = scenes_storage or AiogramBasedScenesStorage(aiogram_storage=dp.storage)
         cls.init(dp)
 
