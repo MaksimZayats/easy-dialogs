@@ -1,16 +1,17 @@
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Optional, Union, Sequence, Callable, List
+from typing import Optional, Union, Sequence, Callable, Tuple
 
 from aiogram import Bot
 from aiogram.types import ReplyKeyboardMarkup, InlineKeyboardMarkup, ReplyKeyboardRemove, \
     Message as AiogramMessage, MediaGroup, InputFile
 
+from dialog import bases
 from dialog.utils import is_url
 
 
 @dataclass
-class BaseMessage:
+class Message(bases.BaseMessage):
     text: Optional[str] = None
 
     attachment_type: Optional[str] = None
@@ -21,9 +22,9 @@ class BaseMessage:
                              ReplyKeyboardRemove]] = None
 
     def __post_init__(self):
-        self.custom_messages = self.get_custom_messages()
+        self._custom_messages = self.convert_to_custom_message()
 
-    def get_custom_messages(self) -> List['CustomMessage']:
+    def convert_to_custom_message(self) -> Tuple['CustomMessage']:
         custom_messages = []
 
         if self.attachment_type and self.attachments:
@@ -81,10 +82,14 @@ class BaseMessage:
         else:
             custom_messages.append(CustomMessage(text=self.text, reply_markup=self.keyboard))
 
-        return custom_messages
+        return tuple(custom_messages)
+
+    async def send(self, chat_id: Union[int, str]):
+        for custom_message in self._custom_messages:
+            await custom_message.send(chat_id=chat_id)
 
 
-class CustomMessage:
+class CustomMessage(bases.BaseMessage):
     def __init__(self,
                  send_method: Optional[Callable] = None,  # AutoDetect
                  **message_kwargs):
@@ -138,12 +143,6 @@ class CustomMessage:
 
     async def send(self, chat_id: Union[str, int]) -> AiogramMessage:
         return await self.send_method(chat_id=chat_id, **self.message_kwargs)
-
-
-@dataclass
-class FutureScene:
-    class_name: Optional[str]
-    scene_name: str
 
 
 class AttachmentType:

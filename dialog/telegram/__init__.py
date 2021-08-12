@@ -1,1 +1,1 @@
-from .dialog import Handler, View, Scene, Relation, Router, Dialog, FutureDialog
+from .dialog import Handler, View, Scene, Relation, Router, Dialog, AiogramBasedScenesStorage

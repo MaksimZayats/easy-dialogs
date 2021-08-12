@@ -1,7 +1,5 @@
-from abc import ABC, abstractmethod
-from copy import deepcopy
-from typing import Optional, Union, Dict, Callable, \
-    AsyncIterator, Any, List, Sequence, Set, Awaitable, Type
+from typing import Optional, Union, Callable, \
+    Any, List, Sequence, Awaitable
 
 from aiogram import Dispatcher
 from aiogram.dispatcher.filters import AbstractFilter
@@ -10,222 +8,10 @@ from aiogram.dispatcher.storage import BaseStorage
 from aiogram.types import Message as AiogramMessage, CallbackQuery
 from aiogram.types.base import TelegramObject
 
+from dialog import bases
+from dialog import defaults
 from dialog.utils import run_function
-from .types import BaseMessage, CustomMessage, EventType, FutureScene
-
-
-class _DialogMeta(type):
-    def __new__(mcs, cls_name: str, superclasses: tuple, attributes: dict, **kwargs):
-        cls: Type['Dialog'] = super().__new__(mcs, cls_name, superclasses, attributes)  # type: ignore
-
-        is_abstract = getattr(attributes.get('Meta', {}), 'abstract', False)
-
-        if is_abstract:
-            return cls
-
-        namespace = getattr(attributes.get('Meta', {}), 'namespace', cls_name)
-
-        for key, value in cls.__dict__.items():  # type: str, Any
-            if isinstance(value, Scene):
-                scene = value
-
-                if not scene.name:
-                    scene.name = key
-
-                if not scene.namespace:
-                    scene.namespace = namespace
-
-                scene.register()
-            elif isinstance(value, Router):
-                router = value
-
-                if not router.namespace:
-                    router.namespace = namespace
-
-                router.register()
-
-        cls.register_dialog(dialog=cls)
-
-        return cls
-
-    @property
-    def initialized_scenes(cls: Type['Dialog']) -> Dict[str, 'Scene']:  # type: ignore
-        return cls._initialized_scenes
-
-    @property
-    def initialized_routers(cls: Type['Dialog']) -> Set['Router']:  # type: ignore
-        return cls._initialized_routers
-
-    @property
-    def initialized_dialogs(cls: Type['Dialog']) -> Dict[str, Type['Dialog']]:  # type: ignore
-        return cls._initialized_dialogs
-
-
-class BaseScenesStorage(ABC):
-    @abstractmethod
-    async def get_scenes_history(self, *,
-                                 chat_id: Union[int, str],
-                                 user_id: Union[int, str]) -> List[str]:
-        """
-        :returns: List of full names
-        """
-
-    @abstractmethod
-    async def update_scenes_history(self, *,
-                                    chat_id: Union[int, str],
-                                    user_id: Union[int, str],
-                                    new_scenes_history: Sequence[str]) -> Sequence[str]:
-        """
-        :returns: Scenes History
-        """
-
-    @abstractmethod
-    async def set_current_scene(self, *,
-                                chat_id: Union[int, str],
-                                user_id: Union[int, str],
-                                new_scene: 'Scene') -> List[str]:
-        """
-        Sets the user's current scene: append the new scene full name to scenes history.
-
-        :returns: Scenes History
-        """
-
-    async def get_current_scene(self, *,
-                                chat_id: Union[int, str],
-                                user_id: Union[int, str]) -> Optional['Scene']:
-        scene_ids = await self.get_scenes_history(user_id=user_id, chat_id=chat_id)
-
-        if scene_ids:
-            return Dialog.initialized_scenes.get(scene_ids[-1], None)
-        else:
-            return None
-
-    async def get_previous_scene(self, *,
-                                 chat_id: Union[int, str],
-                                 user_id: Union[int, str]) -> Optional['Scene']:
-        scenes_history = await self.get_scenes_history(chat_id=chat_id, user_id=user_id)
-
-        try:
-            return Dialog.initialized_scenes[scenes_history[-2]]
-        except IndexError:
-            return None
-
-    @staticmethod
-    async def get_next_scene(*,
-                             current_scene: Optional['Scene'],
-                             current_event_type: str,
-                             handler_args: tuple,
-                             handler_kwargs: dict) -> Optional['Scene']:
-        if current_scene:
-            for relation in current_scene.relations:
-                if current_event_type in relation.event_types and \
-                        await relation.check_filters(
-                            *handler_args, event_type=current_event_type, **handler_kwargs):
-                    for on_transition_function in relation.on_transition:
-                        await run_function(on_transition_function, *handler_args, **handler_kwargs)
-
-                    return await relation.get_scene(*handler_args, **handler_kwargs)
-
-        for router in Dialog.initialized_routers:
-            for relation in router.relations:
-                if current_event_type in relation.event_types and \
-                        await relation.check_filters(
-                            *handler_args, event_type=current_event_type, **handler_kwargs):
-                    for on_transition_function in relation.on_transition:
-                        await run_function(on_transition_function, *handler_args, **handler_kwargs)
-
-                    return await relation.get_scene(*handler_args, **handler_kwargs)
-
-        return None
-
-
-class FutureDialog:
-    """
-    Used to create a link to a dialog that has not yet been initialized.
-    Can only be used to create scene relation.
-    """
-
-    def __init__(self, class_name: Optional[str] = None):
-        self.class_name = class_name
-
-    def __getattr__(self, scene_name: str) -> FutureScene:
-        return FutureScene(class_name=self.class_name, scene_name=scene_name)
-
-
-class Handler:
-    def __init__(self, type_: str):
-        self._type = type_
-
-    async def __call__(self, *args, **kwargs):
-        """
-        It is a function-router.
-        Redirects the received update to the desired scene.
-        """
-
-        obj: Union[AiogramMessage, CallbackQuery, TelegramObject] = args[0]
-
-        try:
-            user_id = obj.from_user.id
-        except AttributeError:
-            user_id = obj.user.id  # NOQA
-
-        try:
-            chat_id = obj.chat.id
-        except AttributeError:
-            try:
-                chat_id = obj.message.chat.id
-            except AttributeError:
-                chat_id = user_id
-
-        previous_scene = await Dialog.scenes_storage.get_previous_scene(user_id=user_id, chat_id=chat_id)
-        current_scene = await Dialog.scenes_storage.get_current_scene(user_id=user_id, chat_id=chat_id)
-
-        while True:  # While to skip transitional scenes
-            for key in Dialog.KEYS_FOR_PREVIOUS_SCENES:
-                kwargs[key] = previous_scene
-
-            for key in Dialog.KEYS_FOR_CURRENT_SCENES:
-                kwargs[key] = current_scene
-
-            for key in Dialog.KEYS_FOR_NEXT_SCENES:
-                kwargs[key] = None
-
-            next_scene = await Dialog.scenes_storage.get_next_scene(
-                current_scene=current_scene, current_event_type=self._type,
-                handler_args=args, handler_kwargs=kwargs)
-
-            if next_scene is None:
-                raise SkipHandler
-
-            if current_scene:
-                for key in Dialog.KEYS_FOR_NEXT_SCENES:
-                    kwargs[key] = next_scene
-
-                for on_exit_function in current_scene.on_exit:
-                    await run_function(on_exit_function, *args, **kwargs)
-
-                for key in Dialog.KEYS_FOR_NEXT_SCENES:
-                    kwargs[key] = None
-
-            if next_scene.can_stay and current_scene != next_scene:
-                await Dialog.scenes_storage.set_current_scene(
-                    chat_id=chat_id, user_id=user_id, new_scene=next_scene)
-
-            for key in Dialog.KEYS_FOR_PREVIOUS_SCENES:
-                kwargs[key] = current_scene
-
-            for key in Dialog.KEYS_FOR_CURRENT_SCENES:
-                kwargs[key] = next_scene
-
-            for on_entry_function in next_scene.on_enter:
-                await run_function(on_entry_function, *args, **kwargs)
-
-            await run_function(next_scene.view, *args, **kwargs)
-
-            if not next_scene.is_transitional_scene:
-                break
-
-            previous_scene, current_scene = current_scene, next_scene
+from .types import EventType
 
 
 class View:
@@ -260,7 +46,7 @@ class View:
         return sent_messages
 
 
-class AiogramBasedScenesStorage(BaseScenesStorage):
+class AiogramBasedScenesStorage(bases.BaseScenesStorage):
     def __init__(self,
                  aiogram_storage: BaseStorage,
                  data_key: str = 'scenes_history'):
@@ -302,194 +88,104 @@ class AiogramBasedScenesStorage(BaseScenesStorage):
         return scenes_history
 
 
-class Scene:
-    def __init__(self,
-                 *,
-                 name: Optional[str] = None,
-                 namespace: Optional[str] = None,
-
-                 messages: Union[
-                     'BaseMessage', CustomMessage,
-                     Sequence[Union[CustomMessage, 'BaseMessage']],
-
-                     Callable[..., Union[CustomMessage, 'BaseMessage']],
-                     Callable[..., Sequence[Union[CustomMessage, 'BaseMessage']]],
-                     Callable[..., Awaitable[Union[CustomMessage, 'BaseMessage']]],
-                     Callable[..., Sequence[Awaitable[Union[CustomMessage, 'BaseMessage']]]],
-
-                     Sequence[Callable[..., Union[CustomMessage, 'BaseMessage']]],
-                     Sequence[Callable[..., Sequence[Union[CustomMessage, 'BaseMessage']]]],
-                     Sequence[Callable[..., Awaitable[Union[CustomMessage, 'BaseMessage']]]],
-                     Sequence[Callable[..., Sequence[Awaitable[Union[CustomMessage, 'BaseMessage']]]]]
-                 ] = tuple(),
-
-                 relations: Union['Relation', Sequence['Relation']] = tuple(),
-
-                 view_function: Callable = View.send_new_message,
-                 on_pre_view: Union[Callable, Sequence[Callable]] = tuple(),
-                 on_post_view: Union[Callable, Sequence[Callable]] = tuple(),
-
-                 on_enter: Union[Callable, Sequence[Callable]] = tuple(),
-                 on_exit: Union[Callable, Sequence[Callable]] = tuple(),
-
-                 is_transitional_scene: bool = False,
-                 can_stay: bool = True,
-                 custom_kwargs: Optional[dict] = None,
-                 ):
-        self.name = name  # Will be updated by `DialogMeta`
-        self.namespace = namespace  # Will be updated by `DialogMeta`
-
-        if isinstance(messages, (BaseMessage, CustomMessage, Callable)):
-            messages = (messages,)
-        if isinstance(relations, Relation):
-            relations = (relations,)
-        if isinstance(on_pre_view, Callable):
-            on_pre_view = (on_pre_view,)
-        if isinstance(on_post_view, Callable):
-            on_post_view = (on_post_view,)
-        if isinstance(on_enter, Callable):
-            on_enter = (on_enter,)
-        if isinstance(on_exit, Callable):
-            on_exit = (on_exit,)
-
-        self.messages = messages
-        self.relations = relations
-
-        _view_function = deepcopy(view_function)
-
-        view_function = self._pre_view(view_function)
-        view_function = self._post_view(view_function)
-        self.view = view_function
-        self.view.__wrapped__ = _view_function
-
-        self.on_pre_view = on_pre_view
-        self.on_post_view = on_post_view
-
-        self.on_enter = on_enter
-        self.on_exit = on_exit
-
-        self.is_transitional_scene = is_transitional_scene
-        self.can_stay = can_stay
-
-        for name, value in (custom_kwargs or dict()).items():
-            setattr(self, name, value)
-
-    @property
-    def full_name(self) -> str:
+class Handler(bases.BaseHandler):
+    async def __call__(self, *args, **kwargs):
         """
-        Returns `Scene` name with `namespace`
-        :return: {self.namespace}.{self.name}
+        It is a function-router.
+        Redirects the received update to the desired scene.
         """
-        return f'{self.namespace}.{self.name}'
 
-    def register(self) -> None:
-        if not self.name:
-            raise ValueError("Can't register `Scene` without name")
+        obj: Union[AiogramMessage, CallbackQuery, TelegramObject] = args[0]
 
-        if not self.namespace:
-            raise ValueError("Can't register `Scene` without namespace")
+        try:
+            user_id = obj.from_user.id
+        except AttributeError:
+            user_id = obj.user.id  # NOQA
 
-        Dialog.register_scene(scene=self)
+        try:
+            chat_id = obj.chat.id
+        except AttributeError:
+            try:
+                chat_id = obj.message.chat.id
+            except AttributeError:
+                chat_id = user_id
 
+        previous_scene = await Dialog.scenes_storage.get_previous_scene(user_id=user_id, chat_id=chat_id)
+        current_scene = await Dialog.scenes_storage.get_current_scene(user_id=user_id, chat_id=chat_id)
+
+        while True:  # While to skip transitional scenes
+            for key in Dialog.KEYS_FOR_PREVIOUS_SCENES:
+                kwargs[key] = previous_scene
+
+            for key in Dialog.KEYS_FOR_CURRENT_SCENES:
+                kwargs[key] = current_scene
+
+            for key in Dialog.KEYS_FOR_NEXT_SCENES:
+                kwargs[key] = None
+
+            next_scene = await Dialog.scenes_storage.get_next_scene(
+                current_scene=current_scene, current_event_type=self.event_type,
+                handler_args=args, handler_kwargs=kwargs)
+
+            if next_scene is None:
+                raise SkipHandler
+
+            if current_scene:
+                for key in Dialog.KEYS_FOR_NEXT_SCENES:
+                    kwargs[key] = next_scene
+
+                for on_exit_function in current_scene.on_exit:
+                    await run_function(on_exit_function, *args, **kwargs)
+
+                for key in Dialog.KEYS_FOR_NEXT_SCENES:
+                    kwargs[key] = None
+
+            if next_scene.can_stay and current_scene != next_scene:
+                await Dialog.scenes_storage.set_current_scene(
+                    chat_id=chat_id, user_id=user_id, new_scene=next_scene)
+
+            for key in Dialog.KEYS_FOR_PREVIOUS_SCENES:
+                kwargs[key] = current_scene
+
+            for key in Dialog.KEYS_FOR_CURRENT_SCENES:
+                kwargs[key] = next_scene
+
+            for on_entry_function in next_scene.on_enter:
+                await run_function(on_entry_function, *args, **kwargs)
+
+            await run_function(next_scene.view, *args, **kwargs)
+
+            if not next_scene.is_transitional_scene:
+                break
+
+            previous_scene, current_scene = current_scene, next_scene
+
+
+class Scene(bases.BaseScene):
     def init(self, dp: Optional[Dispatcher] = None) -> None:
         for relation in self.relations:
             relation.init_scene(namespace=self.namespace)
             relation.init_filters(dp=dp)
 
-    async def get_messages(self, *args, **kwargs) -> AsyncIterator[CustomMessage]:
-        for message in self.messages:
-            if isinstance(message, BaseMessage):
-                for aiogram_message in message.custom_messages:
-                    yield aiogram_message
-            elif isinstance(message, CustomMessage):
-                yield message
-            else:
-                messages: Union[BaseMessage, CustomMessage, Sequence[Union[BaseMessage, CustomMessage]]] = \
-                    await run_function(message, *args, **kwargs)
-                if isinstance(messages, BaseMessage):
-                    for aiogram_message in messages.custom_messages:
-                        yield aiogram_message
-                elif isinstance(messages, CustomMessage):
-                    yield messages
-                else:
-                    for _message in messages:
-                        if isinstance(_message, BaseMessage):
-                            for aiogram_message in _message.custom_messages:
-                                yield aiogram_message
-                        elif isinstance(_message, CustomMessage):
-                            yield _message
-
-    def _pre_view(self, view: Callable):
-        async def wrapper(*args, **kwargs):
-            for pre_handle_function in self.on_pre_view:
-                await run_function(pre_handle_function, *args, **kwargs)
-
-            return await view(*args, **kwargs)
-
-        return wrapper
-
-    def _post_view(self, view: Callable):
-        async def wrapper(*args, **kwargs):
-            view_result = await view(*args, **kwargs)
-            kwargs['view_result'] = view_result
-
-            for post_handle_function in self.on_post_view:
-                await run_function(post_handle_function, *args, **kwargs)
-
-            return view_result
-
-        return wrapper
-
-    def __repr__(self) -> str:
-        return f'<Scene {self.full_name}>'
+    @property
+    def default_view(self) -> Callable:
+        return View.send_new_message
 
 
-class Relation:
+class Relation(bases.BaseRelation):
     def __init__(self,
-                 to: Union[Scene, str, FutureScene,
-                           Callable[..., 'Scene'],
-                           Callable[..., Awaitable['Scene']]],
-                 *filters_as_args: Union[Callable[..., Union[bool, Awaitable[bool]]], AbstractFilter],
-                 event_types: Union[str, Sequence[str]] = (EventType.MESSAGE,),
+                 to: Union[bases.BaseScene, str, defaults.FutureScene,
+                           Callable[..., bases.BaseScene],
+                           Callable[..., Awaitable[bases.BaseScene]]],
+                 *filters_as_args: Union[Callable[..., bool],
+                                         Callable[..., Awaitable[bool]],
+                                         AbstractFilter],
+                 event_types: Union[str, Sequence[str]] = (EventType.MESSAGE, ),
                  on_transition: Union[Callable, Sequence[Callable]] = tuple(),
                  **filters_as_kwargs: Any
                  ):
-
-        if isinstance(to, Scene):
-            self.to_scene = to
-            self.to_scene_name = to.full_name
-            self.get_scene_func = None
-            self.future_scene = None
-        elif isinstance(to, FutureScene):
-            self.to_scene = None  # type: ignore
-            self.to_scene_name = None  # type: ignore
-            self.get_scene_func = None
-            self.future_scene = to
-        elif isinstance(to, str):
-            self.to_scene = None  # type: ignore
-            self.to_scene_name = to
-            self.get_scene_func = None  # type: ignore
-            self.future_scene = None  # type: ignore
-        elif isinstance(to, Callable):
-            self.to_scene = None  # type: ignore
-            self.to_scene_name = None  # type: ignore
-            self.get_scene_func = to
-            self.future_scene = None  # type: ignore
-
-        if isinstance(event_types, str):
-            event_types = (event_types,)
-
-        self.event_types = event_types
-
-        if isinstance(on_transition, Callable):
-            on_transition = (on_transition,)
-
-        self.on_transition = on_transition
-
-        self.filters: Dict[str, List[Callable[..., Union[bool, Awaitable[bool]]]]] = dict()
-
-        self._filters_as_args = filters_as_args
-        self._filters_as_kwargs = filters_as_kwargs
+        super().__init__(to, *filters_as_args, event_types=event_types,
+                         on_transition=on_transition, **filters_as_kwargs)
 
     def init_filters(self, dp: Optional[Dispatcher] = None):
         dp = dp or Dispatcher.get_current()
@@ -523,87 +219,36 @@ class Relation:
             self.filters[event] = [filter_.check for filter_ in filters] + \
                                   [getattr(filter_, 'check', filter_) for filter_ in self._filters_as_args]
 
-    def init_scene(self, namespace: str):
-        if self.to_scene_name:
-            if self.to_scene_name.count('.') == 0:
-                self.to_scene_name = f"{namespace}.{self.to_scene_name}"
-            try:
-                self.to_scene = Dialog.initialized_scenes[self.to_scene_name]
-            except KeyError:
-                raise RuntimeError(f'Scene "{self.to_scene_name}" not found')
-        elif self.to_scene:
-            self.to_scene_name = self.to_scene.full_name
-        elif self.future_scene:
-            if self.future_scene.class_name is None:
-                if self.future_scene.scene_name.count('.') == 0:
-                    self.to_scene_name = f"{namespace}.{self.future_scene.scene_name}"
-                else:
-                    self.to_scene_name = self.future_scene.scene_name
 
-                try:
-                    self.to_scene = Dialog.initialized_scenes[self.to_scene_name]
-                except KeyError:
-                    raise RuntimeError(f'Scene "{self.to_scene_name}" not found')
-
-                return
-
-            cls = Dialog.initialized_dialogs.get(self.future_scene.class_name)
-
-            if cls is None:
-                raise RuntimeError(f'Class "{self.future_scene.class_name}" for "FutureScene" not found!')
-
-            scene: 'Scene' = getattr(cls, self.future_scene.scene_name)
-
-            if scene is None:
-                raise RuntimeError(f'Scene name "{self.future_scene.scene_name}" for "FutureScene" not found!')
-
-            self.to_scene = scene
-            self.to_scene_name = scene.full_name
-
-    async def get_scene(self, *args, **kwargs) -> 'Scene':
-        if self.get_scene_func:
-            return await run_function(self.get_scene_func, *args, **kwargs)
-        else:
-            return self.to_scene
-
-    async def check_filters(self, *args, event_type: str, **kwargs) -> bool:
-        for filter_ in self.filters[event_type]:
-            if not await run_function(filter_, *args, **kwargs):
-                return False
-        else:
-            return True
-
-
-class Router:
-    def __init__(self,
-                 *relations: 'Relation',
-                 namespace: Optional[str] = None):
-        self.relations = relations
-        self.namespace: str = namespace  # type: ignore
-
-    def register(self):
-        if self.namespace is None:
-            raise ValueError("Can't register `Router` without namespace")
-
-        Dialog.register_router(router=self)
-
+class Router(bases.BaseRouter):
     def init(self, dp: Optional[Dispatcher] = None):
         for relation in self.relations:
             relation.init_scene(namespace=self.namespace)
             relation.init_filters(dp)
 
 
-class Dialog(metaclass=_DialogMeta):
-    scenes_storage: BaseScenesStorage = NotImplemented  # type: ignore
+class Dialog(bases.BaseDialog):
+    @classmethod
+    def register(cls,
+                 dp: Dispatcher,
+                 scenes_storage: Optional[bases.BaseScenesStorage] = None,
+                 handler: Callable[..., Callable[..., Awaitable]] = Handler):
+        cls.scenes_storage = scenes_storage or AiogramBasedScenesStorage(aiogram_storage=dp.storage)
+        cls.init(dp)
 
-    _initialized_dialogs: Dict[str, Type['Dialog']] = dict()  # Dict[class_name, Type['Dialog']]
-    _initialized_scenes: Dict[str, 'Scene'] = dict()  # Dict[Scene.full_name, Scene]
-    _initialized_routers: Set['Router'] = set()
+        dp.register_message_handler(handler(event_type=EventType.MESSAGE))
+        dp.register_callback_query_handler(handler(event_type=EventType.CALLBACK_QUERY))
+        dp.register_poll_handler(handler(event_type=EventType.POLL))
+        dp.register_poll_answer_handler(handler(event_type=EventType.POLL_ANSWER))
+        dp.register_channel_post_handler(handler(event_type=EventType.CHANNEL_POST))
+        dp.register_chat_member_handler(handler(event_type=EventType.CHAT_MEMBER))
+        dp.register_chosen_inline_handler(handler(event_type=EventType.CHOSEN_INLINE_RESULT))
+        dp.register_edited_message_handler(handler(event_type=EventType.EDITED_MESSAGE))
+        dp.register_pre_checkout_query_handler(handler(event_type=EventType.PRE_CHECKOUT_QUERY))
+        dp.register_shipping_query_handler(handler(event_type=EventType.SHIPPING_QUERY))
+        dp.register_my_chat_member_handler(handler(event_type=EventType.MY_CHAT_MEMBER))
 
-    # Configuration
-    KEYS_FOR_PREVIOUS_SCENES: Sequence[str] = ('previous_scene',)
-    KEYS_FOR_CURRENT_SCENES: Sequence[str] = ('current_scene',)
-    KEYS_FOR_NEXT_SCENES: Sequence[str] = ('next_scene',)
+        # TODO: register all Events
 
     @classmethod
     def init(cls, dp: Optional[Dispatcher] = None):
@@ -612,44 +257,3 @@ class Dialog(metaclass=_DialogMeta):
 
         for router in cls.initialized_routers:
             router.init(dp=dp)
-
-    @classmethod
-    def register(cls,
-                 dp: Dispatcher,
-                 scenes_storage: Optional[BaseScenesStorage] = None,
-                 handler: Callable[..., Callable[..., Awaitable]] = Handler):
-        cls.scenes_storage = scenes_storage or AiogramBasedScenesStorage(aiogram_storage=dp.storage)
-        cls.init(dp)
-
-        dp.register_message_handler(handler(type_=EventType.MESSAGE))
-        dp.register_callback_query_handler(handler(type_=EventType.CALLBACK_QUERY))
-        dp.register_poll_handler(handler(type_=EventType.POLL))
-        dp.register_poll_answer_handler(handler(type_=EventType.POLL_ANSWER))
-        dp.register_channel_post_handler(handler(type_=EventType.CHANNEL_POST))
-        dp.register_chat_member_handler(handler(type_=EventType.CHAT_MEMBER))
-        dp.register_chosen_inline_handler(handler(type_=EventType.CHOSEN_INLINE_RESULT))
-        dp.register_edited_message_handler(handler(type_=EventType.EDITED_MESSAGE))
-        dp.register_pre_checkout_query_handler(handler(type_=EventType.PRE_CHECKOUT_QUERY))
-        dp.register_shipping_query_handler(handler(type_=EventType.SHIPPING_QUERY))
-        dp.register_my_chat_member_handler(handler(type_=EventType.MY_CHAT_MEMBER))
-
-        # TODO: register all Events
-
-    @classmethod
-    def register_scene(cls, scene: Scene):
-        cls._initialized_scenes[scene.full_name] = scene
-
-    @classmethod
-    def register_router(cls, router: Router):
-        cls._initialized_routers.add(router)
-
-    @classmethod
-    def register_dialog(cls, dialog: Type['Dialog']):
-        cls._initialized_dialogs[dialog.__name__] = dialog
-
-    class Meta:
-        """
-        The ``Meta`` class is used to configure metadata for the Dialog.
-        """
-        abstract: bool = False
-        namespace: str = ''
