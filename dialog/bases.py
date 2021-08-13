@@ -3,11 +3,11 @@ from copy import deepcopy
 from typing import (Any, AsyncIterator, Awaitable, Callable, Dict, Iterable,
                     List, Optional, Sequence, Set, Type, Union)
 
-from dialog.defaults import FutureScene
-from dialog.utils import run_function
+from dialog.shared.types import FutureScene
+from dialog.shared.utils import run_function
 
 
-class DialogMeta(ABCMeta):
+class _DialogMeta(ABCMeta):
     def __new__(mcs, cls_name: str, superclasses: tuple, attributes: dict, **kwargs):
         cls: Type['BaseDialog'] = super().__new__(mcs, cls_name, superclasses, attributes)  # type: ignore
 
@@ -251,24 +251,32 @@ class BaseScenesStorage(ABC):
                              handler_args: tuple,
                              handler_kwargs: dict) -> Optional['BaseScene']:
         if current_scene:
-            for relation in current_scene.relations:
+            for relation in current_scene.relations:  # NOQA
                 if current_event_type in relation.event_types and \
                         await relation.check_filters(
-                            *handler_args, event_type=current_event_type, **handler_kwargs):
-                    for on_transition_function in relation.on_transition:
-                        await run_function(on_transition_function, *handler_args, **handler_kwargs)
+                            handler_args=handler_args, handler_kwargs=handler_kwargs,
+                            event_type=current_event_type):
+                    next_scene = await relation.get_scene(*handler_args, **handler_kwargs)
 
-                    return await relation.get_scene(*handler_args, **handler_kwargs)
+                    for on_transition_function in relation.on_transition:
+                        await run_function(on_transition_function, *handler_args,
+                                           **handler_kwargs | {BaseDialog.KEY_FOR_NEXT_SCENES: next_scene})
+
+                    return next_scene
 
         for router in BaseDialog.initialized_routers:
-            for relation in router.relations:
+            for relation in router.relations:  # NOQA
                 if current_event_type in relation.event_types and \
                         await relation.check_filters(
-                            *handler_args, event_type=current_event_type, **handler_kwargs):
-                    for on_transition_function in relation.on_transition:
-                        await run_function(on_transition_function, *handler_args, **handler_kwargs)
+                            handler_args=handler_args, handler_kwargs=handler_kwargs,
+                            event_type=current_event_type):
+                    next_scene = await relation.get_scene(*handler_args, **handler_kwargs)
 
-                    return await relation.get_scene(*handler_args, **handler_kwargs)
+                    for on_transition_function in relation.on_transition:
+                        await run_function(on_transition_function, *handler_args,
+                                           **handler_kwargs | {BaseDialog.KEY_FOR_NEXT_SCENES: next_scene})
+
+                    return next_scene
 
         return None
 
@@ -369,9 +377,12 @@ class BaseRelation(ABC):
         else:
             return self.to_scene
 
-    async def check_filters(self, *args, event_type: str, **kwargs) -> bool:
+    async def check_filters(self,
+                            handler_args: tuple,
+                            handler_kwargs: Dict[str, Any],
+                            event_type: str) -> bool:
         for filter_ in self.filters[event_type]:
-            if not await run_function(filter_, *args, **kwargs):
+            if not await run_function(filter_, *handler_args, **handler_kwargs):
                 return False
         else:
             return True
@@ -396,15 +407,67 @@ class BaseRouter(ABC):
 
 
 class BaseHandler(ABC):
-    def __init__(self, event_type: str):
+    def __init__(self, dialog: Type['BaseDialog'], event_type: str):
+        self.Dialog = dialog
         self.event_type = event_type
+
+        self.__name__ = f'DialogHandler: {event_type.title()}'
 
     @abstractmethod
     async def __call__(self, *args, **kwargs):
         pass
 
+    @abstractmethod
+    def skip_handler(self):
+        pass
 
-class BaseDialog(ABC, metaclass=DialogMeta):
+    async def default_handler(self,
+                              handler_args: tuple,
+                              handler_kwargs: Dict[str, Any],
+                              chat_id: Union[str, int],
+                              user_id: Union[str, int]):
+        previous_scene = await self.Dialog.scenes_storage.get_previous_scene(user_id=user_id, chat_id=chat_id)
+        current_scene = await self.Dialog.scenes_storage.get_current_scene(user_id=user_id, chat_id=chat_id)
+
+        while True:  # While to skip transitional scenes
+            handler_kwargs[self.Dialog.KEY_FOR_PREVIOUS_SCENES] = previous_scene
+            handler_kwargs[self.Dialog.KEY_FOR_CURRENT_SCENES] = current_scene
+            handler_kwargs[self.Dialog.KEY_FOR_NEXT_SCENES] = None
+
+            next_scene = await self.Dialog.scenes_storage.get_next_scene(
+                current_scene=current_scene, current_event_type=self.event_type,
+                handler_args=handler_args, handler_kwargs=handler_kwargs)
+
+            if next_scene is None:
+                return self.skip_handler()
+
+            if current_scene:
+                handler_kwargs[self.Dialog.KEY_FOR_NEXT_SCENES] = next_scene
+
+                for on_exit_function in current_scene.on_exit:
+                    await run_function(on_exit_function, *handler_args, **handler_kwargs)
+
+                handler_kwargs[self.Dialog.KEY_FOR_NEXT_SCENES] = None
+
+            if next_scene.can_stay and current_scene != next_scene:
+                await self.Dialog.scenes_storage.set_current_scene(
+                    chat_id=chat_id, user_id=user_id, new_scene=next_scene)
+
+            handler_kwargs[self.Dialog.KEY_FOR_PREVIOUS_SCENES] = current_scene
+            handler_kwargs[self.Dialog.KEY_FOR_CURRENT_SCENES] = next_scene
+
+            for on_entry_function in next_scene.on_enter:
+                await run_function(on_entry_function, *handler_args, **handler_kwargs)
+
+            await run_function(next_scene.view, *handler_args, **handler_kwargs)
+
+            if not next_scene.is_transitional_scene:
+                break
+
+            previous_scene, current_scene = current_scene, next_scene
+
+
+class BaseDialog(ABC, metaclass=_DialogMeta):
     scenes_storage: BaseScenesStorage = NotImplemented  # type: ignore
 
     _initialized_dialogs: Dict[str, Type['BaseDialog']] = dict()  # Dict[class_name, Type['Dialog']]
@@ -412,9 +475,9 @@ class BaseDialog(ABC, metaclass=DialogMeta):
     _initialized_routers: Set[BaseRouter] = set()
 
     # Configuration
-    KEYS_FOR_PREVIOUS_SCENES: Sequence[str] = ('previous_scene',)
-    KEYS_FOR_CURRENT_SCENES: Sequence[str] = ('current_scene',)
-    KEYS_FOR_NEXT_SCENES: Sequence[str] = ('next_scene',)
+    KEY_FOR_PREVIOUS_SCENES: str = 'previous_scene'
+    KEY_FOR_CURRENT_SCENES: str = 'current_scene'
+    KEY_FOR_NEXT_SCENES: str = 'next_scene'
 
     @classmethod
     @abstractmethod

@@ -2,7 +2,7 @@ from setuptools import find_packages, setup
 
 setup(
     name='dialog',
-    version='0.2.1a0',
+    version='0.3.0b0',
     packages=find_packages(include=['dialog', 'dialog.*']),
     url='https://github.com/MaximZayats/aiogram-dialog',
     license='',
@@ -11,5 +11,6 @@ setup(
     description='',
     install_requires=[
         'aiogram~=2.14.3',
+        'vkbottle~=3.0.2'
     ],
 )

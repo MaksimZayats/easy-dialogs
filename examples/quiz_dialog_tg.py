@@ -9,7 +9,8 @@ from aiogram.types import BotCommand
 from aiogram.types import Message as AiogramMessage
 from aiogram.types import ReplyKeyboardRemove
 
-from dialog.defaults import FutureDialog
+from dialog.shared.storage import AiogramBasedScenesStorage
+from dialog.shared.types import FutureDialog
 from dialog.telegram import Dialog, Relation, Router, Scene
 from dialog.telegram.types import Message
 
@@ -80,7 +81,7 @@ class QuizUtils(Dialog):
 
     router = Router(
         Relation(lambda *, current_scene: current_scene or QuizUtils.start_scene,
-                 commands='start'),
+                 commands='start', on_transition=lambda *args, **kwargs: print(kwargs)),
         Relation(QuizUtils.score,
                  is_game_started, commands='score'),
         Relation(lambda *, current_scene: current_scene,
@@ -142,8 +143,11 @@ class Questions(Dialog):
 
 
 async def run_bot():
-    bot = Bot(token='TOKEN', parse_mode='html')  # NOQA
-    dp = Dispatcher(bot, storage=MemoryStorage())
+    bot = Bot(token='1839686110:AAE9T24Y5yzkfEGIVHH7D3sS_p9NM_BVq-k', parse_mode='html')  # NOQA
+
+    storage = MemoryStorage()
+
+    dp = Dispatcher(bot, storage=storage)
 
     await bot.set_my_commands(
         commands=[BotCommand('start', 'Перезапуск бота'),
@@ -157,7 +161,7 @@ async def run_bot():
                   BotCommand('score', 'Check the score')],
         language_code=None)
 
-    Dialog.register(dp)
+    Dialog.register(dp, scenes_storage=AiogramBasedScenesStorage(storage=storage))
 
     await dp.start_polling()
 

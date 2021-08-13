@@ -4,15 +4,14 @@ from typing import (Any, Awaitable, Callable, List, Optional, Sequence, Type,
 from aiogram import Dispatcher
 from aiogram.dispatcher.filters import AbstractFilter
 from aiogram.dispatcher.handler import SkipHandler
-from aiogram.dispatcher.storage import BaseStorage
 from aiogram.types import CallbackQuery
 from aiogram.types import Message as AiogramMessage
 from aiogram.types.base import TelegramObject
 
-from dialog import bases, defaults
-from dialog.utils import run_function
-
-from .types import EventType
+from dialog import bases
+from dialog.shared.storage import AiogramBasedScenesStorage
+from dialog.shared.types import FutureScene
+from dialog.telegram.types import EventType
 
 
 class View:
@@ -35,7 +34,7 @@ class View:
             except AttributeError:
                 chat_id = user_id
 
-        scene: 'Scene' = kwargs.get(Dialog.KEYS_FOR_CURRENT_SCENES[0])
+        scene: 'Scene' = kwargs.get(Dialog.KEY_FOR_CURRENT_SCENES)
 
         async for message_to_send in scene.get_messages(*args, **kwargs):
             sent_message = await message_to_send.send(chat_id=chat_id)
@@ -45,48 +44,6 @@ class View:
             await obj.answer()
 
         return sent_messages
-
-
-class AiogramBasedScenesStorage(bases.BaseScenesStorage):
-    def __init__(self,
-                 aiogram_storage: BaseStorage,
-                 data_key: str = 'scenes_history'):
-        self.storage = aiogram_storage
-        self.data_key = data_key
-
-    async def get_scenes_history(self, *,
-                                 chat_id: Union[int, str],
-                                 user_id: Union[int, str]) -> List[str]:
-        data = await self.storage.get_data(chat=chat_id, user=user_id)
-        return data.get(self.data_key, [])
-
-    async def update_scenes_history(self, *,
-                                    chat_id: Union[int, str],
-                                    user_id: Union[int, str],
-                                    new_scenes_history: Sequence[str]) -> Sequence[str]:
-        await self.storage.update_data(chat=chat_id, user=user_id,
-                                       **{self.data_key: new_scenes_history})
-
-        return new_scenes_history
-
-    async def set_current_scene(self, *,
-                                chat_id: Union[int, str],
-                                user_id: Union[int, str],
-                                new_scene: 'Scene') -> Sequence[str]:
-        data = await self.storage.get_data(chat=chat_id, user=user_id)
-
-        scenes_history: List[str] = data.get(self.data_key, [])
-        try:
-            if scenes_history[-1] != new_scene.full_name:
-                scenes_history.append(new_scene.full_name)
-        except IndexError:
-            scenes_history.append(new_scene.full_name)
-
-        await self.storage.update_data(
-            chat=chat_id, user_id=user_id,
-            **{self.data_key: scenes_history})
-
-        return scenes_history
 
 
 class Handler(bases.BaseHandler):
@@ -111,55 +68,11 @@ class Handler(bases.BaseHandler):
             except AttributeError:
                 chat_id = user_id
 
-        previous_scene = await Dialog.scenes_storage.get_previous_scene(user_id=user_id, chat_id=chat_id)
-        current_scene = await Dialog.scenes_storage.get_current_scene(user_id=user_id, chat_id=chat_id)
+        await self.default_handler(handler_args=args, handler_kwargs=kwargs,
+                                   chat_id=chat_id, user_id=user_id)
 
-        while True:  # While to skip transitional scenes
-            for key in Dialog.KEYS_FOR_PREVIOUS_SCENES:
-                kwargs[key] = previous_scene
-
-            for key in Dialog.KEYS_FOR_CURRENT_SCENES:
-                kwargs[key] = current_scene
-
-            for key in Dialog.KEYS_FOR_NEXT_SCENES:
-                kwargs[key] = None
-
-            next_scene = await Dialog.scenes_storage.get_next_scene(
-                current_scene=current_scene, current_event_type=self.event_type,
-                handler_args=args, handler_kwargs=kwargs)
-
-            if next_scene is None:
-                raise SkipHandler
-
-            if current_scene:
-                for key in Dialog.KEYS_FOR_NEXT_SCENES:
-                    kwargs[key] = next_scene
-
-                for on_exit_function in current_scene.on_exit:
-                    await run_function(on_exit_function, *args, **kwargs)
-
-                for key in Dialog.KEYS_FOR_NEXT_SCENES:
-                    kwargs[key] = None
-
-            if next_scene.can_stay and current_scene != next_scene:
-                await Dialog.scenes_storage.set_current_scene(
-                    chat_id=chat_id, user_id=user_id, new_scene=next_scene)
-
-            for key in Dialog.KEYS_FOR_PREVIOUS_SCENES:
-                kwargs[key] = current_scene
-
-            for key in Dialog.KEYS_FOR_CURRENT_SCENES:
-                kwargs[key] = next_scene
-
-            for on_entry_function in next_scene.on_enter:
-                await run_function(on_entry_function, *args, **kwargs)
-
-            await run_function(next_scene.view, *args, **kwargs)
-
-            if not next_scene.is_transitional_scene:
-                break
-
-            previous_scene, current_scene = current_scene, next_scene
+    def skip_handler(self):
+        raise SkipHandler
 
 
 class Scene(bases.BaseScene):
@@ -175,7 +88,7 @@ class Scene(bases.BaseScene):
 
 class Relation(bases.BaseRelation):
     def __init__(self,
-                 to: Union[bases.BaseScene, str, defaults.FutureScene,
+                 to: Union[bases.BaseScene, str, FutureScene,
                            Callable[..., bases.BaseScene],
                            Callable[..., Awaitable[bases.BaseScene]]],
                  *filters_as_args: Union[Callable[..., bool],
@@ -234,20 +147,20 @@ class Dialog(bases.BaseDialog):
                  dp: Dispatcher,
                  scenes_storage: Optional[bases.BaseScenesStorage] = None,
                  handler: Type[bases.BaseHandler] = Handler):
-        cls.scenes_storage = scenes_storage or AiogramBasedScenesStorage(aiogram_storage=dp.storage)
+        cls.scenes_storage = scenes_storage or AiogramBasedScenesStorage(storage=dp.storage)
         cls.init(dp)
 
-        dp.register_message_handler(handler(event_type=EventType.MESSAGE))
-        dp.register_callback_query_handler(handler(event_type=EventType.CALLBACK_QUERY))
-        dp.register_poll_handler(handler(event_type=EventType.POLL))
-        dp.register_poll_answer_handler(handler(event_type=EventType.POLL_ANSWER))
-        dp.register_channel_post_handler(handler(event_type=EventType.CHANNEL_POST))
-        dp.register_chat_member_handler(handler(event_type=EventType.CHAT_MEMBER))
-        dp.register_chosen_inline_handler(handler(event_type=EventType.CHOSEN_INLINE_RESULT))
-        dp.register_edited_message_handler(handler(event_type=EventType.EDITED_MESSAGE))
-        dp.register_pre_checkout_query_handler(handler(event_type=EventType.PRE_CHECKOUT_QUERY))
-        dp.register_shipping_query_handler(handler(event_type=EventType.SHIPPING_QUERY))
-        dp.register_my_chat_member_handler(handler(event_type=EventType.MY_CHAT_MEMBER))
+        dp.register_message_handler(handler(dialog=cls, event_type=EventType.MESSAGE))
+        dp.register_callback_query_handler(handler(dialog=cls, event_type=EventType.CALLBACK_QUERY))
+        dp.register_poll_handler(handler(dialog=cls, event_type=EventType.POLL))
+        dp.register_poll_answer_handler(handler(dialog=cls, event_type=EventType.POLL_ANSWER))
+        dp.register_channel_post_handler(handler(dialog=cls, event_type=EventType.CHANNEL_POST))
+        dp.register_chat_member_handler(handler(dialog=cls, event_type=EventType.CHAT_MEMBER))
+        dp.register_chosen_inline_handler(handler(dialog=cls, event_type=EventType.CHOSEN_INLINE_RESULT))
+        dp.register_edited_message_handler(handler(dialog=cls, event_type=EventType.EDITED_MESSAGE))
+        dp.register_pre_checkout_query_handler(handler(dialog=cls, event_type=EventType.PRE_CHECKOUT_QUERY))
+        dp.register_shipping_query_handler(handler(dialog=cls, event_type=EventType.SHIPPING_QUERY))
+        dp.register_my_chat_member_handler(handler(dialog=cls, event_type=EventType.MY_CHAT_MEMBER))
 
         # TODO: register all Events
 

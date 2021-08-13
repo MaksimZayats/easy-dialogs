@@ -8,7 +8,7 @@ from aiogram.types import Message as AiogramMessage
 from aiogram.types import ReplyKeyboardMarkup, ReplyKeyboardRemove
 
 from dialog import bases
-from dialog.utils import is_url
+from dialog.shared.utils import is_url
 
 
 @dataclass
