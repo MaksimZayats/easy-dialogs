@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import os
 from typing import Optional, Type
 
 from aiogram import Bot, Dispatcher
@@ -13,7 +14,6 @@ from dialog.shared.storage import AiogramBasedScenesStorage
 from dialog.shared.types import FutureDialog
 from dialog.telegram import Dialog, Relation, Router, Scene
 from dialog.telegram.types import Message
-
 
 logging.basicConfig(level=logging.INFO)
 
@@ -143,7 +143,7 @@ class Questions(Dialog):
 
 
 async def run_bot():
-    bot = Bot(token='1839686110:AAE9T24Y5yzkfEGIVHH7D3sS_p9NM_BVq-k', parse_mode='html')  # NOQA
+    bot = Bot(token=os.getenv('TG_TOKEN'), parse_mode='html')
 
     storage = MemoryStorage()
 

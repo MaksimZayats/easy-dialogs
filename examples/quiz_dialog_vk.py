@@ -1,4 +1,5 @@
 import logging
+import os
 from typing import Optional, Type
 
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
@@ -123,7 +124,7 @@ class Questions(Dialog):
 
 
 def run_bot():
-    bot = Bot(token='2f8d7b333f9f390f92eecc2f3e77a6f3b240423c0f84cfecd3cb8aaca9036eea8df8d1c0be211cd9d817a')
+    bot = Bot(token=os.getenv('VK_TOKEN'))
 
     storage = MemoryStorage()
 
