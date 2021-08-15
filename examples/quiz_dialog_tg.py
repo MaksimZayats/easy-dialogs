@@ -31,9 +31,9 @@ async def process_correct_answer(message: AiogramMessage, state: FSMContext):
         data['points'] = data.get('points', 0) + 3
 
     if message.from_user.language_code == 'ru':
-        await message.reply(f'<b>Верно! ✅</b>')
+        await message.reply('<b>Верно! ✅</b>')
     else:
-        await message.reply(f'<b>Correct! ✅</b>')
+        await message.reply('<b>Correct! ✅</b>')
 
 
 async def process_incorrect_answer(message: AiogramMessage, state: FSMContext):
@@ -41,9 +41,9 @@ async def process_incorrect_answer(message: AiogramMessage, state: FSMContext):
         data['points'] = data.get('points', 0) - 3
 
     if message.from_user.language_code == 'ru':
-        await message.reply(f'<b>Неверно! ❌</b>')
+        await message.reply('<b>Неверно! ❌</b>')
     else:
-        await message.reply(f'<b>Incorrect! ❌</b>')
+        await message.reply('<b>Incorrect! ❌</b>')
 
 
 async def process_move_to_previous_scene(message: AiogramMessage):
@@ -81,7 +81,7 @@ class QuizUtils(Dialog):
 
     router = Router(
         Relation(lambda *, current_scene: current_scene or QuizUtils.start_scene,
-                 commands='start', on_transition=lambda *args, **kwargs: print(kwargs)),
+                 commands='start'),
         Relation(QuizUtils.score,
                  is_game_started, commands='score'),
         Relation(lambda *, current_scene: current_scene,

@@ -28,14 +28,14 @@ async def process_correct_answer(message: VkMessage, state: FSMContext):
     async with state.proxy() as data:
         data['points'] = data.get('points', 0) + 3
 
-    await message.answer(f'Верно! ✅', reply_to=message.id)
+    await message.answer('Верно! ✅', reply_to=message.id)
 
 
 async def process_incorrect_answer(message: VkMessage, state: FSMContext):
     async with state.proxy() as data:
         data['points'] = data.get('points', 0) - 3
 
-    await message.answer(f'Неверно! ❌', reply_to=message.id)
+    await message.answer('Неверно! ❌', reply_to=message.id)
 
 
 async def process_move_to_previous_scene(message: VkMessage):
