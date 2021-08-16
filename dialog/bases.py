@@ -92,6 +92,23 @@ class BaseScene(ABC):
                  can_stay: bool = True,
                  **custom_kwargs: Any,
                  ):
+        """
+        :param name: Name of the `Scene`. If `None` will be updated by `DialogMeta`.
+        :param namespace: Namespace of the `Scene`. If `None` will be updated by `DialogMeta`.
+        :param messages: Will be used in the `view' function.
+        :param relations: Relations of the `Scene`.
+        :param view_function: If `None` the default view function will be used.
+        :param on_pre_view: Functions that will be executed before the main view function.
+        :param on_post_view: Functions that will be executed after the main view function.
+                             To get the result of executing the main view function,
+                             specify `view_result` in the function keyword parameters.
+        :param on_enter: Functions that will be executed when switching to this scene.
+        :param on_exit: Functions that will be executed when exiting this scene.
+        :param is_transitional_scene: If `True`, then immediately after switching to this scene,
+                                      relations will be checked.
+        :param can_stay: If `False`, then this scene cannot be set as the current scene.
+        :param custom_kwargs:
+        """
         self.name = name  # Will be updated by `DialogMeta`
         self.namespace = namespace  # Will be updated by `DialogMeta`
 
