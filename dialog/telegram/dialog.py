@@ -1,5 +1,5 @@
-from typing import (Any, Awaitable, Callable, List, Optional, Sequence, Type,
-                    Union)
+from typing import (Any, Awaitable, Callable, List, Optional, Sequence, Tuple,
+                    Type, Union)
 
 from aiogram import Dispatcher
 from aiogram.dispatcher.filters import AbstractFilter
@@ -75,11 +75,56 @@ class Handler(bases.BaseHandler):
         raise SkipHandler
 
 
+class FiltersGroup(bases.BaseFiltersGroup):
+    @property
+    def default_event_types(self) -> Tuple[str]:
+        return EventType.MESSAGE,
+
+    def init(self,
+             dp: Optional[Dispatcher] = None):
+        dp = dp or Dispatcher.get_current()
+
+        for event in self.event_types:
+            if event == 'update':
+                event_handler = dp.updates_handler
+            else:
+                event_handler = getattr(dp, f'{event}_handlers')
+
+            if event_handler is None:
+                continue
+
+            _filters_as_kwargs = self.filters_as_kwargs.copy()
+
+            not_registered_filters: List[str] = []
+
+            while True:
+                try:
+                    filters = dp.filters_factory.resolve(event_handler, **_filters_as_kwargs)
+
+                    if not_registered_filters:
+                        print(f"Filter(s): {', '.join(not_registered_filters)}; Not registered.")
+                    break
+                except NameError as e:
+                    incorrect_filter_name = str(e).split(' ')[-1].replace("'", "")
+                    _filters_as_kwargs.pop(incorrect_filter_name)
+                    not_registered_filters.append(incorrect_filter_name)
+
+            self.filters_to_check[event] = \
+                [filter_.check for filter_ in filters] + \
+                [getattr(filter_, 'check', filter_) for filter_ in self.filters_as_args]
+
+
 class Scene(bases.BaseScene):
+    filters: FiltersGroup
+    relations: Tuple['Relation', ...]
+
     def init(self, dp: Optional[Dispatcher] = None) -> None:
         for relation in self.relations:
             relation.init_scene(namespace=self.namespace)
-            relation.init_filters(dp=dp)
+            relation.filters.init(dp=dp)
+
+        if self.filters:
+            self.filters.init(dp=dp)
 
     @property
     def default_view(self) -> Callable:
@@ -87,6 +132,8 @@ class Scene(bases.BaseScene):
 
 
 class Relation(bases.BaseRelation):
+    filters: FiltersGroup
+
     def __init__(self,
                  to: Union[bases.BaseScene, str, FutureScene,
                            Callable[..., bases.BaseScene],
@@ -101,44 +148,18 @@ class Relation(bases.BaseRelation):
         super().__init__(to, *filters_as_args, event_types=event_types,
                          on_transition=on_transition, **filters_as_kwargs)
 
-    def init_filters(self, dp: Optional[Dispatcher] = None):
-        dp = dp or Dispatcher.get_current()
-
-        for event in self.event_types:
-            if event == 'update':
-                event_handler = dp.updates_handler
-            else:
-                event_handler = getattr(dp, f'{event}_handlers')
-
-            if event_handler is None:
-                continue
-
-            _filters_as_kwargs = self._filters_as_kwargs.copy()
-
-            not_registered_filters: List[str] = []
-
-            while True:
-                try:
-                    filters = dp.filters_factory.resolve(event_handler, **_filters_as_kwargs)
-
-                    if not_registered_filters:
-                        print(f'Scene "{self.to_scene.full_name}", '
-                              f"filter(s): {', '.join(not_registered_filters)}; Not registered.")
-                    break
-                except NameError as e:
-                    incorrect_filter_name = str(e).split(' ')[-1].replace("'", "")
-                    _filters_as_kwargs.pop(incorrect_filter_name)
-                    not_registered_filters.append(incorrect_filter_name)
-
-            self.filters[event] = [filter_.check for filter_ in filters] + \
-                                  [getattr(filter_, 'check', filter_) for filter_ in self._filters_as_args]
+    @property
+    def default_filters_group(self) -> Type[FiltersGroup]:
+        return FiltersGroup
 
 
 class Router(bases.BaseRouter):
+    relations: Tuple[Relation, ...]
+
     def init(self, dp: Optional[Dispatcher] = None):
         for relation in self.relations:
             relation.init_scene(namespace=self.namespace)
-            relation.init_filters(dp)
+            relation.filters.init(dp=dp)
 
 
 class Dialog(bases.BaseDialog):

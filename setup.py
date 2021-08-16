@@ -2,7 +2,7 @@ from setuptools import find_packages, setup
 
 setup(
     name='dialog',
-    version='0.3.0b0',
+    version='0.3.1b0',
     packages=find_packages(include=['dialog', 'dialog.*']),
     url='https://github.com/MaximZayats/aiogram-dialog',
     license='',

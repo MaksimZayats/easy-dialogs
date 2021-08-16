@@ -1,4 +1,4 @@
-from typing import Any, Callable, Dict, List, Optional, Type
+from typing import Any, Callable, Dict, List, Optional, Tuple, Type
 
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from vkbottle import Bot
@@ -9,7 +9,7 @@ from dialog import bases
 from dialog.shared.storage import AiogramBasedScenesStorage
 from dialog.shared.utils import run_function
 from dialog.vk.types import EventType
-from dialog.vk.utils import set_current_bot, get_current_bot
+from dialog.vk.utils import get_current_bot, set_current_bot
 
 
 class View:
@@ -48,33 +48,27 @@ class Handler(bases.BaseHandler):
         pass
 
 
-class Scene(bases.BaseScene):
-    def init(self, bot: Bot) -> None:
-        for relation in self.relations:
-            relation.init_scene(namespace=self.namespace)
-            relation.init_filters(bot=bot)
-
+class FiltersGroup(bases.BaseFiltersGroup):
     @property
-    def default_view(self) -> Callable:
-        return View.send_new_message
+    def default_event_types(self) -> Tuple[str]:
+        return EventType.MESSAGE,
 
-
-class Relation(bases.BaseRelation):
-    def init_filters(self, bot: Optional[Bot] = None):
+    def init(self,
+             bot: Optional[Bot] = None):
         bot = bot or get_current_bot()
 
         for event in self.event_types:
-            filters_to_check = list(self._filters_as_args) + \
-                               bot.labeler.get_custom_rules(self._filters_as_kwargs)
+            filters_to_check = list(self.filters_as_args) + \
+                               bot.labeler.get_custom_rules(self.filters_as_kwargs)
 
-            self.filters[event] = [getattr(filter_, 'check', filter_)
-                                   for filter_ in filters_to_check]
+            self.filters_to_check[event] = [getattr(filter_, 'check', filter_)
+                                            for filter_ in filters_to_check]
 
-    async def check_filters(self,
-                            handler_args: tuple,
-                            handler_kwargs: Dict[str, Any],
-                            event_type: str) -> bool:
-        for filter_ in self.filters[event_type]:
+    async def check(self,
+                    handler_args: tuple,
+                    handler_kwargs: Dict[str, Any],
+                    event_type: str) -> bool:
+        for filter_ in self.filters_to_check[event_type]:
             filter_result = await run_function(filter_, *handler_args, **handler_kwargs)
 
             if isinstance(filter_result, dict):
@@ -86,11 +80,38 @@ class Relation(bases.BaseRelation):
             return True
 
 
+class Scene(bases.BaseScene):
+    filters: 'FiltersGroup'
+    relations: Tuple['Relation', ...]
+
+    def init(self, bot: Bot) -> None:
+        for relation in self.relations:
+            relation.init_scene(namespace=self.namespace)
+            relation.filters.init(bot=bot)
+
+        if self.filters:
+            self.filters.init(bot=bot)
+
+    @property
+    def default_view(self) -> Callable:
+        return View.send_new_message
+
+
+class Relation(bases.BaseRelation):
+    filters: 'FiltersGroup'
+
+    @property
+    def default_filters_group(self) -> Type[FiltersGroup]:
+        return FiltersGroup
+
+
 class Router(bases.BaseRouter):
+    relations: Tuple[Relation, ...]
+
     def init(self, bot: Bot):
         for relation in self.relations:
             relation.init_scene(namespace=self.namespace)
-            relation.init_filters(bot=bot)
+            relation.filters.init(bot=bot)
 
 
 class Dialog(bases.BaseDialog):

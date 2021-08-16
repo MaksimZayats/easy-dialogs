@@ -1,7 +1,7 @@
 from abc import ABC, ABCMeta, abstractmethod
 from copy import deepcopy
 from typing import (Any, AsyncIterator, Awaitable, Callable, Dict, Iterable,
-                    List, Optional, Sequence, Set, Type, Union)
+                    List, Optional, Sequence, Set, Tuple, Type, Union)
 
 from dialog.shared.types import FutureScene
 from dialog.shared.utils import run_function
@@ -54,6 +54,43 @@ class _DialogMeta(ABCMeta):
         return cls._initialized_dialogs
 
 
+class BaseFiltersGroup(ABC):
+    def __init__(self,
+                 *filters_as_args: Union[Callable[..., bool],
+                                         Callable[..., Awaitable[bool]],
+                                         object],
+                 event_types: Optional[Union[str, Sequence[str]]] = None,
+                 **filters_as_kwargs: Any):
+        self.filters_as_args = filters_as_args
+        self.filters_as_kwargs = filters_as_kwargs
+
+        if isinstance(event_types, str):
+            event_types = (event_types, )
+
+        self.event_types = event_types or self.default_event_types
+
+        self.filters_to_check: Dict[str, List[Callable]] = dict()  # Dict[`EventType(str)`, List[Callable]]]
+
+    @property
+    @abstractmethod
+    def default_event_types(self) -> Tuple[str]:
+        pass
+
+    @abstractmethod
+    def init(self, *args, **kwargs):
+        pass
+
+    async def check(self,
+                    handler_args: tuple,
+                    handler_kwargs: Dict[str, Any],
+                    event_type: str) -> bool:
+        for filter_ in self.filters_to_check[event_type]:
+            if not await run_function(filter_, *handler_args, **handler_kwargs):
+                return False
+        else:
+            return True
+
+
 class BaseMessage(ABC):
     @abstractmethod
     async def send(self, *args, **kwargs):
@@ -88,6 +125,8 @@ class BaseScene(ABC):
                  on_enter: Union[Callable, Sequence[Callable]] = tuple(),
                  on_exit: Union[Callable, Sequence[Callable]] = tuple(),
 
+                 filters: Optional[BaseFiltersGroup] = None,
+
                  is_transitional_scene: bool = False,
                  can_stay: bool = True,
                  **custom_kwargs: Any,
@@ -104,6 +143,7 @@ class BaseScene(ABC):
                              specify `view_result` in the function keyword parameters.
         :param on_enter: Functions that will be executed when switching to this scene.
         :param on_exit: Functions that will be executed when exiting this scene.
+        :param filters: Filters of the `Scene`. If `None` will be ignored.
         :param is_transitional_scene: If `True`, then immediately after switching to this scene,
                                       relations will be checked.
         :param can_stay: If `False`, then this scene cannot be set as the current scene.
@@ -141,6 +181,8 @@ class BaseScene(ABC):
 
         self.on_enter = on_enter
         self.on_exit = on_exit
+
+        self.filters = filters
 
         self.is_transitional_scene = is_transitional_scene
         self.can_stay = can_stay
@@ -269,11 +311,18 @@ class BaseScenesStorage(ABC):
                              handler_kwargs: dict) -> Optional['BaseScene']:
         if current_scene:
             for relation in current_scene.relations:  # NOQA
-                if current_event_type in relation.event_types and \
-                        await relation.check_filters(
+                if current_event_type in relation.filters.event_types and \
+                        await relation.filters.check(
                             handler_args=handler_args, handler_kwargs=handler_kwargs,
                             event_type=current_event_type):
                     next_scene = await relation.get_scene(*handler_args, **handler_kwargs)
+
+                    if next_scene.filters:
+                        if not await next_scene.filters.check(
+                                handler_args=handler_args,
+                                handler_kwargs=handler_kwargs,
+                                event_type=current_event_type):
+                            continue
 
                     for on_transition_function in relation.on_transition:
                         await run_function(on_transition_function, *handler_args,
@@ -283,11 +332,18 @@ class BaseScenesStorage(ABC):
 
         for router in BaseDialog.initialized_routers:
             for relation in router.relations:  # NOQA
-                if current_event_type in relation.event_types and \
-                        await relation.check_filters(
+                if current_event_type in relation.filters.event_types and \
+                        await relation.filters.check(
                             handler_args=handler_args, handler_kwargs=handler_kwargs,
                             event_type=current_event_type):
                     next_scene = await relation.get_scene(*handler_args, **handler_kwargs)
+
+                    if next_scene.filters:
+                        if not await next_scene.filters.check(
+                                handler_args=handler_args,
+                                handler_kwargs=handler_kwargs,
+                                event_type=current_event_type):
+                            continue
 
                     for on_transition_function in relation.on_transition:
                         await run_function(on_transition_function, *handler_args,
@@ -306,7 +362,7 @@ class BaseRelation(ABC):
                  *filters_as_args: Union[Callable[..., bool],
                                          Callable[..., Awaitable[bool]],
                                          object],
-                 event_types: Union[str, Sequence[str]] = ('message',),
+                 event_types: Optional[Union[str, Sequence[str]]] = None,
                  on_transition: Union[Callable, Sequence[Callable]] = tuple(),
                  **filters_as_kwargs: Any
                  ):
@@ -335,20 +391,16 @@ class BaseRelation(ABC):
         if isinstance(event_types, str):
             event_types = (event_types,)
 
-        self.event_types = event_types
-
         if isinstance(on_transition, Callable):
             on_transition = (on_transition,)
 
         self.on_transition = on_transition
 
-        self.filters: Dict[str, List[Callable[..., Union[bool, Awaitable[bool]]]]] = dict()
+        self.filters = self.default_filters_group(*filters_as_args, event_types=event_types, **filters_as_kwargs)
 
-        self._filters_as_args = filters_as_args
-        self._filters_as_kwargs = filters_as_kwargs
-
+    @property
     @abstractmethod
-    def init_filters(self, *args, **kwargs):
+    def default_filters_group(self) -> Type[BaseFiltersGroup]:
         pass
 
     def init_scene(self, namespace: str):
@@ -393,16 +445,6 @@ class BaseRelation(ABC):
             return await run_function(self.get_scene_func, *args, **kwargs)
         else:
             return self.to_scene
-
-    async def check_filters(self,
-                            handler_args: tuple,
-                            handler_kwargs: Dict[str, Any],
-                            event_type: str) -> bool:
-        for filter_ in self.filters[event_type]:
-            if not await run_function(filter_, *handler_args, **handler_kwargs):
-                return False
-        else:
-            return True
 
 
 class BaseRouter(ABC):

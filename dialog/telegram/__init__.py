@@ -1,1 +1,2 @@
-from .dialog import Dialog, Handler, Relation, Router, Scene, View
+from .dialog import (Dialog, FiltersGroup, Handler, Relation, Router, Scene,
+                     View)
