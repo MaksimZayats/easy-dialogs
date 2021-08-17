@@ -1,17 +1,23 @@
 ### About
 
-**Aiogram-dialog** is a framework for creating telegram bots.
+**Easy-dialogs** is a framework for creating chatbots.
 
-**Aiogram-dialog** facilitates the creation of relationships and transitions between scenes (states).
+**Easy-dialog** facilitates the creation of relationships and transitions between scenes (states).
 
-Based on aiogram.
+Based on [aiogram](https://github.com/aiogram/aiogram), [vkbottle](https://github.com/vkbottle/vkbottle).
 
 ### Quickstart
 
 1. Install:
 
 ```bash
-pip install git+https://github.com/MaximZayats/aiogram-dialog
+pip install easy-dialogs
+```
+
+or
+
+```bash
+pip install git+https://github.com/MaximZayats/easy-dialogs
 ```
 
 2. See [examples](examples)
