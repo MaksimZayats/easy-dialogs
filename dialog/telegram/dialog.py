@@ -1,8 +1,7 @@
-from typing import (Any, Awaitable, Callable, List, Optional, Sequence, Tuple,
+from typing import (Callable, List, Optional, Tuple,
                     Type, Union)
 
 from aiogram import Dispatcher
-from aiogram.dispatcher.filters import AbstractFilter
 from aiogram.dispatcher.handler import SkipHandler
 from aiogram.types import CallbackQuery
 from aiogram.types import Message as AiogramMessage
@@ -10,7 +9,6 @@ from aiogram.types.base import TelegramObject
 
 from dialog import bases
 from dialog.shared.storage import AiogramBasedScenesStorage
-from dialog.shared.types import FutureScene
 from dialog.telegram.types import EventType
 
 
@@ -93,25 +91,12 @@ class FiltersGroup(bases.BaseFiltersGroup):
             if event_handler is None:
                 continue
 
-            _filters_as_kwargs = self.filters_as_kwargs.copy()
+            resolved_filters = dp.filters_factory.resolve(event_handler, **self.filters_as_kwargs)
 
-            not_registered_filters: List[str] = []
+            filters_to_check = list(self.filters_as_args) + resolved_filters
 
-            while True:
-                try:
-                    filters = dp.filters_factory.resolve(event_handler, **_filters_as_kwargs)
-
-                    if not_registered_filters:
-                        print(f"Filter(s): {', '.join(not_registered_filters)}; Not registered.")
-                    break
-                except NameError as e:
-                    incorrect_filter_name = str(e).split(' ')[-1].replace("'", "")
-                    _filters_as_kwargs.pop(incorrect_filter_name)
-                    not_registered_filters.append(incorrect_filter_name)
-
-            self.filters_to_check[event] = \
-                [filter_.check for filter_ in filters] + \
-                [getattr(filter_, 'check', filter_) for filter_ in self.filters_as_args]
+            self.filters_to_check[event] = [getattr(filter_, 'check', filter_)
+                                            for filter_ in filters_to_check]
 
 
 class Scene(bases.BaseScene):
@@ -133,20 +118,6 @@ class Scene(bases.BaseScene):
 
 class Relation(bases.BaseRelation):
     filters: FiltersGroup
-
-    def __init__(self,
-                 to: Union[bases.BaseScene, str, FutureScene,
-                           Callable[..., bases.BaseScene],
-                           Callable[..., Awaitable[bases.BaseScene]]],
-                 *filters_as_args: Union[Callable[..., bool],
-                                         Callable[..., Awaitable[bool]],
-                                         AbstractFilter],
-                 event_types: Union[str, Sequence[str]] = (EventType.MESSAGE, ),
-                 on_transition: Union[Callable, Sequence[Callable]] = tuple(),
-                 **filters_as_kwargs: Any
-                 ):
-        super().__init__(to, *filters_as_args, event_types=event_types,
-                         on_transition=on_transition, **filters_as_kwargs)
 
     @property
     def default_filters_group(self) -> Type[FiltersGroup]:

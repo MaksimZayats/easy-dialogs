@@ -64,21 +64,6 @@ class FiltersGroup(bases.BaseFiltersGroup):
             self.filters_to_check[event] = [getattr(filter_, 'check', filter_)
                                             for filter_ in filters_to_check]
 
-    async def check(self,
-                    handler_args: tuple,
-                    handler_kwargs: Dict[str, Any],
-                    event_type: str) -> bool:
-        for filter_ in self.filters_to_check[event_type]:
-            filter_result = await run_function(filter_, *handler_args, **handler_kwargs)
-
-            if isinstance(filter_result, dict):
-                handler_kwargs |= filter_result  # added new kwargs from vkbottle rules
-            else:
-                if not filter_result:
-                    return False
-        else:
-            return True
-
 
 class Scene(bases.BaseScene):
     filters: 'FiltersGroup'

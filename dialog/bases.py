@@ -58,6 +58,8 @@ class BaseFiltersGroup(ABC):
     def __init__(self,
                  *filters_as_args: Union[Callable[..., bool],
                                          Callable[..., Awaitable[bool]],
+                                         Callable[..., dict],
+                                         Callable[..., Awaitable[dict]],
                                          object],
                  event_types: Optional[Union[str, Sequence[str]]] = None,
                  **filters_as_kwargs: Any):
@@ -85,8 +87,13 @@ class BaseFiltersGroup(ABC):
                     handler_kwargs: Dict[str, Any],
                     event_type: str) -> bool:
         for filter_ in self.filters_to_check[event_type]:
-            if not await run_function(filter_, *handler_args, **handler_kwargs):
-                return False
+            result = await run_function(filter_, *handler_args, **handler_kwargs)
+
+            if isinstance(result, dict):
+                handler_kwargs.update(result)
+            else:
+                if not result:
+                    return False
         else:
             return True
 
@@ -361,12 +368,12 @@ class BaseRelation(ABC):
                            Callable[..., Awaitable['BaseScene']]],
                  *filters_as_args: Union[Callable[..., bool],
                                          Callable[..., Awaitable[bool]],
+                                         Callable[..., dict],
+                                         Callable[..., Awaitable[dict]],
                                          object],
                  event_types: Optional[Union[str, Sequence[str]]] = None,
                  on_transition: Union[Callable, Sequence[Callable]] = tuple(),
-                 **filters_as_kwargs: Any
-                 ):
-
+                 **filters_as_kwargs: Any):
         if isinstance(to, BaseScene):
             self.to_scene = to
             self.to_scene_name = to.full_name
