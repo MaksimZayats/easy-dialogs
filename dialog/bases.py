@@ -1,7 +1,7 @@
 from abc import ABC, ABCMeta, abstractmethod
 from copy import deepcopy
-from typing import (Any, AsyncIterator, Awaitable, Callable, Dict, Iterable,
-                    List, Optional, Sequence, Set, Tuple, Type, Union)
+from typing import (Any, AsyncIterator, Awaitable, Callable, Dict, Iterable, List, Optional, Sequence, Set,
+                    Tuple, Type, Union)
 
 from dialog.shared.types import FutureScene
 from dialog.shared.utils import run_function
@@ -56,22 +56,24 @@ class _DialogMeta(ABCMeta):
 
 class BaseFiltersGroup(ABC):
     def __init__(self,
-                 *filters_as_args: Union[Callable[..., bool],
-                                         Callable[..., Awaitable[bool]],
-                                         Callable[..., dict],
-                                         Callable[..., Awaitable[dict]],
-                                         object],
+                 *filters_as_args: Union[
+                     Callable[..., bool],
+                     Callable[..., Awaitable[bool]],
+                     Callable[..., dict],
+                     Callable[..., Awaitable[dict]],
+                     object,
+                 ],
                  event_types: Optional[Union[str, Sequence[str]]] = None,
                  **filters_as_kwargs: Any):
         self.filters_as_args = filters_as_args
         self.filters_as_kwargs = filters_as_kwargs
 
         if isinstance(event_types, str):
-            event_types = (event_types, )
+            event_types = (event_types,)
 
         self.event_types = event_types or self.default_event_types
 
-        self.filters_to_check: Dict[str, List[Callable]] = dict()  # Dict[`EventType(str)`, List[Callable]]]
+        self.filters_to_check: Dict[str, List[Callable]] = {}  # Dict[`EventType(str)`, List[Callable]]]
 
     @property
     @abstractmethod
@@ -82,10 +84,7 @@ class BaseFiltersGroup(ABC):
     def init(self, *args, **kwargs):
         pass
 
-    async def check(self,
-                    handler_args: tuple,
-                    handler_kwargs: Dict[str, Any],
-                    event_type: str) -> bool:
+    async def check(self, handler_args: tuple, handler_kwargs: Dict[str, Any], event_type: str) -> bool:
         for filter_ in self.filters_to_check[event_type]:
             result = await run_function(filter_, *handler_args, **handler_kwargs)
 
@@ -108,36 +107,28 @@ class BaseScene(ABC):
     def __init__(self, *,
                  name: Optional[str] = None,
                  namespace: Optional[str] = None,
-
                  messages: Union[
-                     BaseMessage, Sequence[BaseMessage],
-
+                     BaseMessage,
+                     Sequence[BaseMessage],
                      Callable[..., BaseMessage],
                      Callable[..., Sequence[BaseMessage]],
                      Callable[..., Awaitable[BaseMessage]],
                      Callable[..., Sequence[Awaitable[BaseMessage]]],
-
                      Sequence[Callable[..., BaseMessage]],
                      Sequence[Callable[..., Sequence[BaseMessage]]],
                      Sequence[Callable[..., Awaitable[BaseMessage]]],
-                     Sequence[Callable[..., Sequence[Awaitable[BaseMessage]]]]
-                 ] = tuple(),
-
-                 relations: Union['BaseRelation', Sequence['BaseRelation']] = tuple(),
-
+                     Sequence[Callable[..., Sequence[Awaitable[BaseMessage]]]],
+                 ] = (),
+                 relations: Union['BaseRelation', Sequence['BaseRelation']] = (),
                  view_function: Optional[Callable] = None,
-                 on_pre_view: Union[Callable, Sequence[Callable]] = tuple(),
-                 on_post_view: Union[Callable, Sequence[Callable]] = tuple(),
-
-                 on_enter: Union[Callable, Sequence[Callable]] = tuple(),
-                 on_exit: Union[Callable, Sequence[Callable]] = tuple(),
-
+                 on_pre_view: Union[Callable, Sequence[Callable]] = (),
+                 on_post_view: Union[Callable, Sequence[Callable]] = (),
+                 on_enter: Union[Callable, Sequence[Callable]] = (),
+                 on_exit: Union[Callable, Sequence[Callable]] = (),
                  filters: Optional[BaseFiltersGroup] = None,
-
                  is_transitional_scene: bool = False,
                  can_stay: bool = True,
-                 **custom_kwargs: Any,
-                 ):
+                 **custom_kwargs: Any):
         """
         :param name: Name of the `Scene`. If `None` will be updated by `DialogMeta`.
         :param namespace: Namespace of the `Scene`. If `None` will be updated by `DialogMeta`.
@@ -211,7 +202,8 @@ class BaseScene(ABC):
             if isinstance(message, BaseMessage):
                 yield message
             elif isinstance(message, Callable):
-                messages: Union[BaseMessage, Sequence[BaseMessage]] = await run_function(message, *args, **kwargs)
+                messages: Union[BaseMessage, Sequence[BaseMessage]] = \
+                    await run_function(message, *args, **kwargs)
 
                 if isinstance(messages, BaseMessage):
                     yield messages
@@ -236,7 +228,7 @@ class BaseScene(ABC):
 
         BaseDialog.register_scene(scene=self)
 
-    def _pre_view(self, view: Callable):
+    def _pre_view(self, view: Callable) -> Callable:
         async def wrapper(*args, **kwargs):
             for pre_handle_function in self.on_pre_view:
                 await run_function(pre_handle_function, *args, **kwargs)
@@ -245,7 +237,7 @@ class BaseScene(ABC):
 
         return wrapper
 
-    def _post_view(self, view: Callable):
+    def _post_view(self, view: Callable) -> Callable:
         async def wrapper(*args, **kwargs):
             view_result = await view(*args, **kwargs)
             kwargs['view_result'] = view_result
@@ -319,42 +311,46 @@ class BaseScenesStorage(ABC):
         if current_scene:
             for relation in current_scene.relations:  # NOQA
                 if current_event_type in relation.filters.event_types and \
-                        await relation.filters.check(
-                            handler_args=handler_args, handler_kwargs=handler_kwargs,
-                            event_type=current_event_type):
+                        await relation.filters.check(handler_args=handler_args,
+                                                     handler_kwargs=handler_kwargs,
+                                                     event_type=current_event_type):
                     next_scene = await relation.get_scene(*handler_args, **handler_kwargs)
 
                     if next_scene.filters:
-                        if not await next_scene.filters.check(
-                                handler_args=handler_args,
-                                handler_kwargs=handler_kwargs,
-                                event_type=current_event_type):
+                        if not await next_scene.filters.check(handler_args=handler_args,
+                                                              handler_kwargs=handler_kwargs,
+                                                              event_type=current_event_type):
                             continue
 
                     for on_transition_function in relation.on_transition:
-                        await run_function(on_transition_function, *handler_args,
-                                           **handler_kwargs | {BaseDialog.KEY_FOR_NEXT_SCENES: next_scene})
+                        await run_function(
+                            on_transition_function,
+                            *handler_args,
+                            **handler_kwargs | {BaseDialog.KEY_FOR_NEXT_SCENES: next_scene}
+                        )
 
                     return next_scene
 
         for router in BaseDialog.initialized_routers:
             for relation in router.relations:  # NOQA
                 if current_event_type in relation.filters.event_types and \
-                        await relation.filters.check(
-                            handler_args=handler_args, handler_kwargs=handler_kwargs,
-                            event_type=current_event_type):
+                    await relation.filters.check(handler_args=handler_args,
+                                                 handler_kwargs=handler_kwargs,
+                                                 event_type=current_event_type):
                     next_scene = await relation.get_scene(*handler_args, **handler_kwargs)
 
                     if next_scene.filters:
-                        if not await next_scene.filters.check(
-                                handler_args=handler_args,
-                                handler_kwargs=handler_kwargs,
-                                event_type=current_event_type):
+                        if not await next_scene.filters.check(handler_args=handler_args,
+                                                              handler_kwargs=handler_kwargs,
+                                                              event_type=current_event_type):
                             continue
 
                     for on_transition_function in relation.on_transition:
-                        await run_function(on_transition_function, *handler_args,
-                                           **handler_kwargs | {BaseDialog.KEY_FOR_NEXT_SCENES: next_scene})
+                        await run_function(
+                            on_transition_function,
+                            *handler_args,
+                            **handler_kwargs | {BaseDialog.KEY_FOR_NEXT_SCENES: next_scene}
+                        )
 
                     return next_scene
 
@@ -363,14 +359,20 @@ class BaseScenesStorage(ABC):
 
 class BaseRelation(ABC):
     def __init__(self,
-                 to: Union[BaseScene, str, FutureScene,
-                           Callable[..., 'BaseScene'],
-                           Callable[..., Awaitable['BaseScene']]],
-                 *filters_as_args: Union[Callable[..., bool],
-                                         Callable[..., Awaitable[bool]],
-                                         Callable[..., dict],
-                                         Callable[..., Awaitable[dict]],
-                                         object],
+                 to: Union[
+                     BaseScene,
+                     str,
+                     FutureScene,
+                     Callable[..., 'BaseScene'],
+                     Callable[..., Awaitable['BaseScene']],
+                 ],
+                 *filters_as_args: Union[
+                     Callable[..., bool],
+                     Callable[..., Awaitable[bool]],
+                     Callable[..., dict],
+                     Callable[..., Awaitable[dict]],
+                     object,
+                 ],
                  event_types: Optional[Union[str, Sequence[str]]] = None,
                  on_transition: Union[Callable, Sequence[Callable]] = tuple(),
                  **filters_as_kwargs: Any):
@@ -403,7 +405,8 @@ class BaseRelation(ABC):
 
         self.on_transition = on_transition
 
-        self.filters = self.default_filters_group(*filters_as_args, event_types=event_types, **filters_as_kwargs)
+        self.filters = \
+            self.default_filters_group(*filters_as_args, event_types=event_types, **filters_as_kwargs)
 
     @property
     @abstractmethod
@@ -423,7 +426,7 @@ class BaseRelation(ABC):
         elif self.future_scene:
             if self.future_scene.class_name is None:
                 if self.future_scene.scene_name.count('.') == 0:
-                    self.to_scene_name = f"{namespace}.{self.future_scene.scene_name}"
+                    self.to_scene_name = f'{namespace}.{self.future_scene.scene_name}'
                 else:
                     self.to_scene_name = self.future_scene.scene_name
 
@@ -442,7 +445,9 @@ class BaseRelation(ABC):
             scene: Optional['BaseScene'] = getattr(cls, self.future_scene.scene_name)
 
             if scene is None:
-                raise RuntimeError(f'Scene name "{self.future_scene.scene_name}" for "FutureScene" not found!')
+                raise RuntimeError(
+                    f'Scene name "{self.future_scene.scene_name}" for "FutureScene" not found!'
+                )
 
             self.to_scene = scene
             self.to_scene_name = scene.full_name
@@ -455,9 +460,7 @@ class BaseRelation(ABC):
 
 
 class BaseRouter(ABC):
-    def __init__(self,
-                 *relations: 'BaseRelation',
-                 namespace: Optional[str] = None):
+    def __init__(self, *relations: 'BaseRelation', namespace: Optional[str] = None):
         self.relations = relations
         self.namespace = namespace  # Will be updated by `DialogMeta`
 
@@ -501,8 +504,11 @@ class BaseHandler(ABC):
             handler_kwargs[self.Dialog.KEY_FOR_NEXT_SCENES] = None
 
             next_scene = await self.Dialog.scenes_storage.get_next_scene(
-                current_scene=current_scene, current_event_type=self.event_type,
-                handler_args=handler_args, handler_kwargs=handler_kwargs)
+                current_scene=current_scene,
+                current_event_type=self.event_type,
+                handler_args=handler_args,
+                handler_kwargs=handler_kwargs,
+            )
 
             if next_scene is None:
                 return self.skip_handler()
@@ -517,7 +523,8 @@ class BaseHandler(ABC):
 
             if next_scene.can_stay and current_scene != next_scene:
                 await self.Dialog.scenes_storage.set_current_scene(
-                    chat_id=chat_id, user_id=user_id, new_scene=next_scene)
+                    chat_id=chat_id, user_id=user_id, new_scene=next_scene
+                )
 
             handler_kwargs[self.Dialog.KEY_FOR_PREVIOUS_SCENES] = current_scene
             handler_kwargs[self.Dialog.KEY_FOR_CURRENT_SCENES] = next_scene
@@ -575,5 +582,6 @@ class BaseDialog(ABC, metaclass=_DialogMeta):
         """
         The ``Meta`` class is used to configure metadata for the Dialog.
         """
+
         abstract: bool = False
         namespace: str = ''

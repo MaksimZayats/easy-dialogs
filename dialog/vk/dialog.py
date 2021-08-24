@@ -1,4 +1,4 @@
-from typing import Any, Callable, Dict, List, Optional, Tuple, Type
+from typing import Callable, List, Optional, Tuple, Type
 
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from vkbottle import Bot
@@ -7,7 +7,6 @@ from vkbottle.dispatch.handlers import FromFuncHandler
 
 from dialog import bases
 from dialog.shared.storage import AiogramBasedScenesStorage
-from dialog.shared.utils import run_function
 from dialog.vk.types import EventType
 from dialog.vk.utils import get_current_bot, set_current_bot
 
@@ -24,8 +23,7 @@ class View:
         scene: 'Scene' = kwargs.get(Dialog.KEY_FOR_CURRENT_SCENES)
 
         async for message_to_send in scene.get_messages(*args, **kwargs):
-            sent_messages_ids.append(
-                await message_to_send.send(peer_id=peer_id))
+            sent_messages_ids.append(await message_to_send.send(peer_id=peer_id))
 
         return sent_messages_ids
 
@@ -53,8 +51,7 @@ class FiltersGroup(bases.BaseFiltersGroup):
     def default_event_types(self) -> Tuple[str]:
         return EventType.MESSAGE,
 
-    def init(self,
-             bot: Optional[Bot] = None):
+    def init(self, bot: Optional[Bot] = None):
         bot = bot or get_current_bot()
 
         for event in self.event_types:
@@ -111,7 +108,11 @@ class Dialog(bases.BaseDialog):
         cls.init(bot)
 
         bot.labeler.message_view.handlers.append(
-            FromFuncHandler(handler=handler(dialog=cls, event_type=EventType.MESSAGE), blocking=False))
+            FromFuncHandler(
+                handler=handler(dialog=cls, event_type=EventType.MESSAGE),
+                blocking=False
+            )
+        )
 
     @classmethod
     def init(cls, bot: Bot):

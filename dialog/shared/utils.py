@@ -36,21 +36,21 @@ def check_spec(spec: FullArgSpec, kwargs: dict) -> dict:
 
 
 def is_url(string: str) -> bool:
-    if ":" not in string:
+    if ':' not in string:
         return False
 
-    scheme = string.split(":", 1)[0].lower()
+    scheme = string.split(':', 1)[0].lower()
 
     return scheme in [
-        "http",
-        "https",
-        "file",
-        "ftp",
-        "ssh",
-        "git",
-        "hg",
-        "bzr",
-        "sftp",
-        "svn",
-        "ssh",
+        'http',
+        'https',
+        'file',
+        'ftp',
+        'ssh',
+        'git',
+        'hg',
+        'bzr',
+        'sftp',
+        'svn',
+        'ssh',
     ]

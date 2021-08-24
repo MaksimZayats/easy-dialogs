@@ -28,16 +28,17 @@ class Message(BaseMessage):
                  intent: Optional[str] = None,
                  **kwargs):
         locals().update(kwargs)
-        locals().pop("kwargs")
-        self.message_config = {k: v for k, v in locals().items() if k != "self" and v is not None}
+        locals().pop('kwargs')
+        self.message_config = {key: value for key, value in locals().items()
+                               if key != 'self' and value is not None}
 
     async def send(self, peer_id: int) -> int:
-        self.message_config["peer_id"] = peer_id
+        self.message_config['peer_id'] = peer_id
 
-        return (await get_current_bot().api.request("messages.send", self.message_config))["response"]
+        return (await get_current_bot().api.request('messages.send', self.message_config))['response']
 
 
 class EventType:
     MESSAGE = 'message'
 
-    ALL = (MESSAGE, )
+    ALL = (MESSAGE,)

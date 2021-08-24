@@ -1,5 +1,4 @@
-from typing import (Callable, List, Optional, Tuple,
-                    Type, Union)
+from typing import Callable, List, Optional, Tuple, Type, Union
 
 from aiogram import Dispatcher
 from aiogram.dispatcher.handler import SkipHandler
@@ -66,8 +65,7 @@ class Handler(bases.BaseHandler):
             except AttributeError:
                 chat_id = user_id
 
-        await self.default_handler(handler_args=args, handler_kwargs=kwargs,
-                                   chat_id=chat_id, user_id=user_id)
+        await self.default_handler(handler_args=args, handler_kwargs=kwargs, chat_id=chat_id, user_id=user_id)
 
     def skip_handler(self):
         raise SkipHandler
@@ -78,8 +76,7 @@ class FiltersGroup(bases.BaseFiltersGroup):
     def default_event_types(self) -> Tuple[str]:
         return EventType.MESSAGE,
 
-    def init(self,
-             dp: Optional[Dispatcher] = None):
+    def init(self, dp: Optional[Dispatcher] = None):
         dp = dp or Dispatcher.get_current()
 
         for event in self.event_types:

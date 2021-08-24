@@ -6,9 +6,7 @@ from dialog.bases import BaseScene, BaseScenesStorage
 
 
 class AiogramBasedScenesStorage(BaseScenesStorage):
-    def __init__(self,
-                 storage: BaseStorage,
-                 data_key: str = 'scenes_history'):
+    def __init__(self, storage: BaseStorage, data_key: str = 'scenes_history'):
         self.storage = storage
         self.data_key = data_key
 
@@ -25,8 +23,7 @@ class AiogramBasedScenesStorage(BaseScenesStorage):
                                     chat_id: Union[int, str],
                                     user_id: Union[int, str],
                                     new_scenes_history: Sequence[str]) -> Sequence[str]:
-        await self.storage.update_data(chat=chat_id, user=user_id,
-                                       **{self.data_key: new_scenes_history})
+        await self.storage.update_data(chat=chat_id, user=user_id, **{self.data_key: new_scenes_history})
 
         return new_scenes_history
 
@@ -43,8 +40,6 @@ class AiogramBasedScenesStorage(BaseScenesStorage):
         except IndexError:
             scenes_history.append(new_scene.full_name)
 
-        await self.storage.update_data(
-            chat=chat_id, user=user_id,
-            **{self.data_key: scenes_history})
+        await self.storage.update_data(chat=chat_id, user=user_id, **{self.data_key: scenes_history})
 
         return scenes_history

@@ -18,9 +18,7 @@ class Message(bases.BaseMessage):
     attachment_type: Optional[str] = None
     attachments: Optional[Sequence[str]] = None
 
-    keyboard: Optional[Union[ReplyKeyboardMarkup,
-                             InlineKeyboardMarkup,
-                             ReplyKeyboardRemove]] = None
+    keyboard: Optional[Union[ReplyKeyboardMarkup, InlineKeyboardMarkup, ReplyKeyboardRemove]] = None
 
     def __post_init__(self):
         self._custom_messages = self.convert_to_custom_message()
@@ -77,9 +75,10 @@ class Message(bases.BaseMessage):
                     custom_messages.append(CustomMessage(sticker=self.attachments[0],
                                                          reply_markup=self.keyboard))
                 else:
-                    custom_messages.append(CustomMessage(
-                        **{self.attachment_type.lower(): self.attachments[0]},
-                        caption=self.text, reply_markup=self.keyboard))
+                    custom_messages.append(
+                        CustomMessage(**{self.attachment_type.lower(): self.attachments[0]},
+                                      caption=self.text,
+                                      reply_markup=self.keyboard))
         else:
             custom_messages.append(CustomMessage(text=self.text, reply_markup=self.keyboard))
 
@@ -91,9 +90,7 @@ class Message(bases.BaseMessage):
 
 
 class CustomMessage(bases.BaseMessage):
-    def __init__(self,
-                 send_method: Optional[Callable] = None,  # AutoDetect
-                 **message_kwargs):
+    def __init__(self, send_method: Optional[Callable] = None, **message_kwargs):
         self.message_kwargs = message_kwargs
         self._send_method = send_method
 
@@ -171,7 +168,19 @@ class EventType:
     MY_CHAT_MEMBER = 'my_chat_member'
     CHAT_MEMBER = 'chat_member'
 
-    ALL = (MESSAGE, CALLBACK_QUERY, UPDATE, EDITED_MESSAGE,
-           CHANNEL_POST, EDITED_CHANNEL_POST, INLINE_QUERY,
-           CHOSEN_INLINE_RESULT, SHIPPING_QUERY, PRE_CHECKOUT_QUERY,
-           POLL, POLL_ANSWER, MY_CHAT_MEMBER, CHAT_MEMBER)
+    ALL = (
+        MESSAGE,
+        CALLBACK_QUERY,
+        UPDATE,
+        EDITED_MESSAGE,
+        CHANNEL_POST,
+        EDITED_CHANNEL_POST,
+        INLINE_QUERY,
+        CHOSEN_INLINE_RESULT,
+        SHIPPING_QUERY,
+        PRE_CHECKOUT_QUERY,
+        POLL,
+        POLL_ANSWER,
+        MY_CHAT_MEMBER,
+        CHAT_MEMBER,
+    )
