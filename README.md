@@ -32,17 +32,17 @@ pip install git+https://github.com/MaximZayats/easy-dialogs
 
 ```python
 from dialog.telegram import Dialog, Scene, Router, Relation
-from dialog.telegram.types import Message
+from dialog.telegram.types import SimpleMessage
 
 
 class MyDialog(Dialog):
     router = Router(Relation('MyDialog.scene1',
                              commands='start'))
 
-    scene1 = Scene(messages=Message(text='Inside the Scene 1'),
+    scene1 = Scene(messages=SimpleMessage(text='Inside the Scene 1'),
                    relations=Relation('MyDialog.scene2',
                                       text='scene2'))
-    scene2 = Scene(messages=Message(text='Inside the Scene 2'),
+    scene2 = Scene(messages=SimpleMessage(text='Inside the Scene 2'),
                    relations=Relation('MyDialog.scene1',
                                       text='scene1'))
 

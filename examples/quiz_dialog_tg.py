@@ -13,7 +13,7 @@ from aiogram.types import ReplyKeyboardRemove
 from dialog.shared.storage import AiogramBasedScenesStorage
 from dialog.shared.types import FutureDialog
 from dialog.telegram import Dialog, Relation, Router, Scene
-from dialog.telegram.types import Message
+from dialog.telegram.types import SimpleMessage
 
 
 logging.basicConfig(level=logging.INFO)
@@ -59,22 +59,22 @@ async def process_move_to_previous_scene(message: AiogramMessage):
     )
 
 
-async def get_end_game_message(message: AiogramMessage, state: FSMContext) -> Message:
+async def get_end_game_message(message: AiogramMessage, state: FSMContext) -> SimpleMessage:
     data = await state.get_data()
 
     if message.from_user.language_code == 'ru':
-        return Message(text='Спасибо за игру!\n' f'Ваш результат: <b>{data.get("points", 0)}</b> очков!')
+        return SimpleMessage(text='Спасибо за игру!\n' f'Ваш результат: <b>{data.get("points", 0)}</b> очков!')
     else:
-        return Message(text='Thank you for playing!\n' f'Your score: <b>{data.get("points", 0)}</b> points!')
+        return SimpleMessage(text='Thank you for playing!\n' f'Your score: <b>{data.get("points", 0)}</b> points!')
 
 
-async def get_score_message(message: AiogramMessage, state: FSMContext) -> Message:
+async def get_score_message(message: AiogramMessage, state: FSMContext) -> SimpleMessage:
     data = await state.get_data()
 
     if message.from_user.language_code == 'ru':
-        return Message(text=f"Ваши очки: {data.get('points', 0)}")
+        return SimpleMessage(text=f"Ваши очки: {data.get('points', 0)}")
     else:
-        return Message(text=f"Your score: {data.get('points', 0)}")
+        return SimpleMessage(text=f"Your score: {data.get('points', 0)}")
 
 
 class QuizUtils(Dialog):
@@ -101,19 +101,19 @@ class QuizUtils(Dialog):
     )
 
     game_is_not_started_scene = Scene(
-        messages=lambda msg: Message(text="Вы не начали игру!\nНапишите /start, чтобы начать игру!")
+        messages=lambda msg: SimpleMessage(text="Вы не начали игру!\nНапишите /start, чтобы начать игру!")
         if msg.from_user.language_code == 'ru'
-        else Message(text="You haven't started the game!\nType /start to start the game!"),  # NOQA
+        else SimpleMessage(text="You haven't started the game!\nType /start to start the game!"),  # NOQA
         can_stay=False,
     )
 
     start_scene = Scene(
-        messages=lambda msg: Message(
+        messages=lambda msg: SimpleMessage(
             text=f'Приветствуем в игре, <b>{msg.from_user.first_name}</b>!',
             keyboard=ReplyKeyboardRemove(),
         )
         if msg.from_user.language_code == 'ru'
-        else Message(
+        else SimpleMessage(
             text=f'Welcome to the game, <b>{msg.from_user.first_name}</b>!',
             keyboard=ReplyKeyboardRemove(),
         ),
@@ -134,9 +134,9 @@ class Questions(Dialog):
     Questions: Type['Questions'] = FutureDialog('Questions')
 
     q1 = Scene(
-        messages=lambda msg: Message(text='<i>Вопрос 1:\n</i>2 + 2 = ?')
+        messages=lambda msg: SimpleMessage(text='<i>Вопрос 1:\n</i>2 + 2 = ?')
         if msg.from_user.language_code == 'ru'
-        else Message(text='<i>Question 1:\n</i>2 + 2 = ?'),
+        else SimpleMessage(text='<i>Question 1:\n</i>2 + 2 = ?'),
         relations=Relation(
             Questions.q2,
             text=('4', 'Четыре', 'Four'),
@@ -145,9 +145,9 @@ class Questions(Dialog):
     )
 
     q2 = Scene(
-        messages=lambda msg: Message(text='<i>Вопрос 2:\n</i>3 + 3 = ?')
+        messages=lambda msg: SimpleMessage(text='<i>Вопрос 2:\n</i>3 + 3 = ?')
         if msg.from_user.language_code == 'ru'
-        else Message(text='<i>Question 2:\n</i>3 + 3 = ?'),
+        else SimpleMessage(text='<i>Question 2:\n</i>3 + 3 = ?'),
         relations=Relation(
             Questions.q3,
             text=('6', 'Шесть', 'Six'),
@@ -156,9 +156,9 @@ class Questions(Dialog):
     )
 
     q3 = Scene(
-        messages=lambda msg: Message(text='<i>Вопрос 3:\n</i>6 + 3 = ?')
+        messages=lambda msg: SimpleMessage(text='<i>Вопрос 3:\n</i>6 + 3 = ?')
         if msg.from_user.language_code == 'ru'
-        else Message(text='<i>Question 3:\n</i>6 + 3 = ?'),
+        else SimpleMessage(text='<i>Question 3:\n</i>6 + 3 = ?'),
         relations=Relation(
             QuizUtils.end_scene,
             text=('9', 'Девять', 'Nine'),

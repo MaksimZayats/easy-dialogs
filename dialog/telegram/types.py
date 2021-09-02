@@ -12,7 +12,7 @@ from dialog.shared.utils import is_url
 
 
 @dataclass
-class Message(bases.BaseMessage):
+class SimpleMessage(bases.BaseMessage):
     text: Optional[str] = None
 
     attachment_type: Optional[str] = None
@@ -21,30 +21,30 @@ class Message(bases.BaseMessage):
     keyboard: Optional[Union[ReplyKeyboardMarkup, InlineKeyboardMarkup, ReplyKeyboardRemove]] = None
 
     def __post_init__(self):
-        self._custom_messages = self.convert_to_custom_message()
+        self._default_messages = self._convert_to_default_message()
 
-    def convert_to_custom_message(self) -> Tuple['CustomMessage']:
+    def _convert_to_default_message(self) -> Tuple['Message']:
         custom_messages = []
 
         if self.attachment_type and self.attachments:
             if len(self.attachments) > 1:
                 if self.attachment_type == AttachmentType.STICKER:
                     if self.text:
-                        custom_messages.append(CustomMessage(text=self.text))
+                        custom_messages.append(Message(text=self.text))
 
                     for attachment in self.attachments[:-1]:
-                        custom_messages.append(CustomMessage(sticker=attachment))
+                        custom_messages.append(Message(sticker=attachment))
 
-                    custom_messages.append(CustomMessage(sticker=self.attachments[-1],
-                                                         reply_markup=self.keyboard))
+                    custom_messages.append(Message(sticker=self.attachments[-1],
+                                                   reply_markup=self.keyboard))
 
                 elif self.attachment_type == AttachmentType.ANIMATION:
                     for attachment in self.attachments[:-1]:
-                        custom_messages.append(CustomMessage(animation=attachment))
+                        custom_messages.append(Message(animation=attachment))
 
-                    custom_messages.append(CustomMessage(animation=self.attachments[-1],
-                                                         caption=self.text,
-                                                         reply_markup=self.keyboard))
+                    custom_messages.append(Message(animation=self.attachments[-1],
+                                                   caption=self.text,
+                                                   reply_markup=self.keyboard))
                 else:
                     """Если вложений > 1. Отправка медиа группы"""
                     media_group = MediaGroup()
@@ -65,31 +65,31 @@ class Message(bases.BaseMessage):
                         else:
                             attach_method(InputFile(path_or_bytesio=attachment))
 
-                    custom_messages.append(CustomMessage(media=media_group))
+                    custom_messages.append(Message(media=media_group))
 
             else:
                 if self.attachment_type == AttachmentType.STICKER:
                     if self.text:
-                        custom_messages.append(CustomMessage(text=self.text))
+                        custom_messages.append(Message(text=self.text))
 
-                    custom_messages.append(CustomMessage(sticker=self.attachments[0],
-                                                         reply_markup=self.keyboard))
+                    custom_messages.append(Message(sticker=self.attachments[0],
+                                                   reply_markup=self.keyboard))
                 else:
                     custom_messages.append(
-                        CustomMessage(**{self.attachment_type.lower(): self.attachments[0]},
-                                      caption=self.text,
-                                      reply_markup=self.keyboard))
+                        Message(**{self.attachment_type.lower(): self.attachments[0]},
+                                caption=self.text,
+                                reply_markup=self.keyboard))
         else:
-            custom_messages.append(CustomMessage(text=self.text, reply_markup=self.keyboard))
+            custom_messages.append(Message(text=self.text, reply_markup=self.keyboard))
 
         return tuple(custom_messages)
 
     async def send(self, chat_id: Union[int, str]):
-        for custom_message in self._custom_messages:
+        for custom_message in self._default_messages:
             await custom_message.send(chat_id=chat_id)
 
 
-class CustomMessage(bases.BaseMessage):
+class Message(bases.BaseMessage):
     def __init__(self, send_method: Optional[Callable] = None, **message_kwargs):
         self.message_kwargs = message_kwargs
         self._send_method = send_method
