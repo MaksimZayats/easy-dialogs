@@ -98,10 +98,10 @@ class Router(bases.BaseRouter):
 
 class Dialog(bases.BaseDialog):
     @classmethod
-    def register(cls,
-                 bot: Bot,
-                 scenes_storage: Optional[bases.BaseScenesStorage] = None,
-                 handler: Type[bases.BaseHandler] = Handler):
+    def register_handlers(cls,
+                          bot: Bot,
+                          scenes_storage: Optional[bases.BaseScenesStorage] = None,
+                          handler: Type[bases.BaseHandler] = Handler):
         set_current_bot(bot=bot)
 
         cls.scenes_storage = scenes_storage or AiogramBasedScenesStorage(storage=MemoryStorage())

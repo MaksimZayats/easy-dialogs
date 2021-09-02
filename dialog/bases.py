@@ -561,7 +561,7 @@ class BaseDialog(ABC, metaclass=_DialogMeta):
 
     @classmethod
     @abstractmethod
-    def register(cls, *args, **kwargs):
+    def register_handlers(cls, *args, **kwargs):
         """
         Registers an event handler for the dialog
         """
