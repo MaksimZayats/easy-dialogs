@@ -1,11 +1,11 @@
 from inspect import FullArgSpec, getfullargspec
-from typing import Any, Callable, Coroutine, TypeVar, Union
-
+from typing import Any, Awaitable, Callable, Coroutine, TypeVar, Union
 
 T = TypeVar('T')
 
 
 async def run_function(function: Union[Callable[..., Coroutine[Any, Any, T]],
+                                       Callable[..., Awaitable[T]],
                                        Callable[..., T]],
                        *args, **kwargs) -> T:
     try:

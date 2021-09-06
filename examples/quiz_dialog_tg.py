@@ -59,16 +59,22 @@ async def process_move_to_previous_scene(message: AiogramMessage):
     )
 
 
-async def get_end_game_message(message: AiogramMessage, state: FSMContext) -> SimpleMessage:
+async def get_end_game_message(message: AiogramMessage,
+                               state: FSMContext) -> SimpleMessage:
     data = await state.get_data()
 
     if message.from_user.language_code == 'ru':
-        return SimpleMessage(text='Спасибо за игру!\n' f'Ваш результат: <b>{data.get("points", 0)}</b> очков!')
+        return SimpleMessage(
+            text='Спасибо за игру!\n'
+                 f'Ваш результат: <b>{data.get("points", 0)}</b> очков!')
     else:
-        return SimpleMessage(text='Thank you for playing!\n' f'Your score: <b>{data.get("points", 0)}</b> points!')
+        return SimpleMessage(
+            text='Thank you for playing!\n'
+                 f'Your score: <b>{data.get("points", 0)}</b> points!')
 
 
-async def get_score_message(message: AiogramMessage, state: FSMContext) -> SimpleMessage:
+async def get_score_message(message: AiogramMessage,
+                            state: FSMContext) -> SimpleMessage:
     data = await state.get_data()
 
     if message.from_user.language_code == 'ru':
@@ -84,26 +90,41 @@ class QuizUtils(Dialog):
     router = Router(
         Relation(
             lambda *, current_scene: current_scene or QuizUtils.start_scene,
-            lambda: {'123': 123},
-            lambda *args, **kwargs: print(args, kwargs) or True,
             commands='start',
         ),
-        Relation(QuizUtils.score, is_game_started, commands='score'),
-        Relation(lambda *, current_scene: current_scene, is_game_started, commands='repeat'),
+        Relation(
+            QuizUtils.score,
+            is_game_started,
+            commands='score'
+        ),
+        Relation(
+            lambda *, current_scene: current_scene,
+            is_game_started,
+            commands='repeat'
+        ),
         Relation(
             lambda *, previous_scene: previous_scene,
             is_game_started,
             commands='back',
             on_transition=process_move_to_previous_scene,
         ),
-        Relation(QuizUtils.incorrect_answer, is_game_started),
-        Relation(QuizUtils.game_is_not_started_scene, is_game_not_started),
+        Relation(
+            QuizUtils.incorrect_answer,
+            is_game_started
+        ),
+        Relation(
+            QuizUtils.game_is_not_started_scene,
+            is_game_not_started
+        ),
     )
 
     game_is_not_started_scene = Scene(
-        messages=lambda msg: SimpleMessage(text="Вы не начали игру!\nНапишите /start, чтобы начать игру!")
-        if msg.from_user.language_code == 'ru'
-        else SimpleMessage(text="You haven't started the game!\nType /start to start the game!"),  # NOQA
+        messages=lambda msg:
+            SimpleMessage(text="Вы не начали игру!\n"
+                               "Напишите /start, чтобы начать игру!")
+            if msg.from_user.language_code == 'ru'
+            else SimpleMessage(text="You haven't started the game!\n"
+                                    "Type /start to start the game!"),
         can_stay=False,
     )
 
@@ -195,7 +216,10 @@ async def run_bot():
         language_code=None,
     )
 
-    Dialog.register_handlers(dp, scenes_storage=AiogramBasedScenesStorage(storage=storage))
+    Dialog.register_handlers(
+        dp,
+        scenes_storage=AiogramBasedScenesStorage(storage=storage)
+    )
 
     await dp.start_polling()
 

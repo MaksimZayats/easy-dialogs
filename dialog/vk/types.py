@@ -32,7 +32,7 @@ class Message(BaseMessage):
         self.message_config = {key: value for key, value in locals().items()
                                if key != 'self' and value is not None}
 
-    async def send(self, peer_id: int) -> int:
+    async def send(self, peer_id: int) -> int:  # type: ignore
         self.message_config['peer_id'] = peer_id
 
         return (await get_current_bot().api.request('messages.send', self.message_config))['response']

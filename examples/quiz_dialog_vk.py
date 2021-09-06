@@ -5,13 +5,14 @@ from typing import Optional, Type
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from aiogram.dispatcher import FSMContext
 from vkbottle import Bot, Keyboard, KeyboardButtonColor, Text
-from vkbottle.bot import Message as VkMessage
+from vkbottle.bot import Message as VKMessage
 
 from dialog.shared.storage import AiogramBasedScenesStorage
 from dialog.shared.types import FutureDialog
 from dialog.vk import Dialog, Relation, Router, Scene
 from dialog.vk.middlewares import FSMMiddleware
 from dialog.vk.types import Message
+
 
 logging.basicConfig(level=logging.INFO)
 
@@ -24,21 +25,21 @@ def is_game_not_started(*, current_scene: Optional['Scene']) -> bool:
     return not is_game_started(current_scene=current_scene)
 
 
-async def process_correct_answer(message: VkMessage, state: FSMContext):
+async def process_correct_answer(message: VKMessage, state: FSMContext):
     async with state.proxy() as data:
         data['points'] = data.get('points', 0) + 3
 
     await message.answer('Верно! ✅', reply_to=message.id)
 
 
-async def process_incorrect_answer(message: VkMessage, state: FSMContext):
+async def process_incorrect_answer(message: VKMessage, state: FSMContext):
     async with state.proxy() as data:
         data['points'] = data.get('points', 0) - 3
 
     await message.answer('Неверно! ❌', reply_to=message.id)
 
 
-async def process_move_to_previous_scene(message: VkMessage):
+async def process_move_to_previous_scene(message: VKMessage):
     current_scenes_history = await Dialog.scenes_storage.get_scenes_history(
         chat_id=message.chat_id, user_id=message.from_id
     )
@@ -53,7 +54,8 @@ async def process_move_to_previous_scene(message: VkMessage):
 async def get_end_game_message(*, state: FSMContext) -> Message:
     data = await state.get_data()
 
-    return Message(message='Спасибо за игру!\n' f'Ваш результат: {data.get("points", 0)} очков!')
+    return Message(message='Спасибо за игру!\n'
+                           f'Ваш результат: {data.get("points", 0)} очков!')
 
 
 async def get_score_message(*, state: FSMContext) -> Message:
@@ -65,18 +67,15 @@ async def get_score_message(*, state: FSMContext) -> Message:
 def create_keyboard() -> str:
     kb = (
         Keyboard()
-        .row()
-        .add(
+        .row().add(
             action=Text('Перезапустить игру', {'action': 'restart'}),
             color=KeyboardButtonColor.POSITIVE,
         )
-        .row()
-        .add(
+        .row().add(
             action=Text('Повторить вопрос', {'action': 'repeat'}),
             color=KeyboardButtonColor.POSITIVE,
         )
-        .row()
-        .add(
+        .row().add(
             action=Text('Посмотреть количество очков', {'action': 'score'}),
             color=KeyboardButtonColor.POSITIVE,
         )
@@ -98,7 +97,11 @@ class QuizUtils(Dialog):
             lambda *, current_scene: current_scene or QuizUtils.start_scene,
             payload={'action': 'restart'},
         ),
-        Relation(QuizUtils.score, is_game_started, payload={'action': 'score'}),
+        Relation(
+            QuizUtils.score,
+            is_game_started,
+            payload={'action': 'score'}
+        ),
         Relation(
             lambda *, current_scene: current_scene,
             is_game_started,
@@ -110,17 +113,25 @@ class QuizUtils(Dialog):
             text='back',
             on_transition=process_move_to_previous_scene,
         ),
-        Relation(QuizUtils.incorrect_answer, is_game_started),
-        Relation(QuizUtils.game_is_not_started_scene, is_game_not_started),
+        Relation(
+            QuizUtils.incorrect_answer,
+            is_game_started
+        ),
+        Relation(
+            QuizUtils.game_is_not_started_scene,
+            is_game_not_started
+        ),
     )
 
     game_is_not_started_scene = Scene(
-        messages=Message(message="Вы не начали игру!\nНапишите /start, чтобы начать игру!"),
+        messages=Message(message='Вы не начали игру!\n'
+                                 'Напишите /start, чтобы начать игру!'),
         can_stay=False,
     )
 
     start_scene = Scene(
-        messages=lambda msg: Message(message='Приветствуем в игре!', keyboard=create_keyboard()),
+        messages=lambda msg: Message(message='Приветствуем в игре!',
+                                     keyboard=create_keyboard()),
         relations=Relation(Questions.q1, lambda: True),
         is_transitional_scene=True,
     )
@@ -139,7 +150,8 @@ class Questions(Dialog):
 
     q1 = Scene(
         messages=Message(message='Вопрос 1:\n2 + 2 = ?'),
-        relations=Relation(Questions.q2, text=['4', 'Четыре'], on_transition=process_correct_answer),
+        relations=Relation(Questions.q2, text=['4', 'Четыре'],
+                           on_transition=process_correct_answer),
     )
 
     q2 = Scene(
@@ -169,9 +181,14 @@ def run_bot():
 
     storage = MemoryStorage()
 
-    bot.labeler.message_view.register_middleware(FSMMiddleware(storage=storage))
+    bot.labeler.message_view.register_middleware(
+        FSMMiddleware(storage=storage)
+    )
 
-    Dialog.register_handlers(bot=bot, scenes_storage=AiogramBasedScenesStorage(storage=storage))
+    Dialog.register_handlers(
+        bot=bot,
+        scenes_storage=AiogramBasedScenesStorage(storage=storage)
+    )
 
     bot.run_forever()
 

@@ -15,7 +15,7 @@ class AiogramBasedScenesStorage(BaseScenesStorage):
                                  user_id: Union[int, str]) -> List[str]:
         data = await self.storage.get_data(chat=chat_id, user=user_id)
 
-        await self.storage.update_data(chat=chat_id, user=user_id, qa='qa')
+        await self.storage.update_data(chat=chat_id, user=user_id)
 
         return data.get(self.data_key, [])
 
@@ -30,7 +30,7 @@ class AiogramBasedScenesStorage(BaseScenesStorage):
     async def set_current_scene(self, *,
                                 chat_id: Union[int, str],
                                 user_id: Union[int, str],
-                                new_scene: 'BaseScene') -> Sequence[str]:
+                                new_scene: 'BaseScene') -> List[str]:
         data = await self.storage.get_data(chat=chat_id, user=user_id)
 
         scenes_history: List[str] = data.get(self.data_key, [])

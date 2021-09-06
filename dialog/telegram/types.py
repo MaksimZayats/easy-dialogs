@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Callable, Optional, Sequence, Tuple, Union
+from typing import Callable, List, Optional, Sequence, Tuple, Union
 
 from aiogram import Bot
 from aiogram.types import InlineKeyboardMarkup, InputFile, MediaGroup
@@ -23,8 +23,8 @@ class SimpleMessage(bases.BaseMessage):
     def __post_init__(self):
         self._default_messages = self._convert_to_default_message()
 
-    def _convert_to_default_message(self) -> Tuple['Message']:
-        custom_messages = []
+    def _convert_to_default_message(self) -> Tuple['Message', ...]:
+        custom_messages: List[Message] = []
 
         if self.attachment_type and self.attachments:
             if len(self.attachments) > 1:
@@ -46,7 +46,7 @@ class SimpleMessage(bases.BaseMessage):
                                                    caption=self.text,
                                                    reply_markup=self.keyboard))
                 else:
-                    """Если вложений > 1. Отправка медиа группы"""
+                    """If attachments > 1: media group"""
                     media_group = MediaGroup()
                     attach_method: Callable = \
                         getattr(media_group, f'attach_{self.attachment_type.lower()}', None)
@@ -76,7 +76,7 @@ class SimpleMessage(bases.BaseMessage):
                                                    reply_markup=self.keyboard))
                 else:
                     custom_messages.append(
-                        Message(**{self.attachment_type.lower(): self.attachments[0]},
+                        Message(**{self.attachment_type.lower(): self.attachments[0]},  # type: ignore
                                 caption=self.text,
                                 reply_markup=self.keyboard))
         else:
@@ -84,9 +84,14 @@ class SimpleMessage(bases.BaseMessage):
 
         return tuple(custom_messages)
 
-    async def send(self, chat_id: Union[int, str]):
-        for custom_message in self._default_messages:
-            await custom_message.send(chat_id=chat_id)
+    async def send(self, chat_id: Union[int, str]) -> List[AiogramMessage]:  # type: ignore
+        sent_messages: List[AiogramMessage] = []
+        for default_message in self._default_messages:
+            sent_messages.append(
+                await default_message.send(chat_id=chat_id)
+            )
+
+        return sent_messages
 
 
 class Message(bases.BaseMessage):
@@ -139,7 +144,9 @@ class Message(bases.BaseMessage):
         elif 'media' in self.message_kwargs:
             return bot.send_media_group
 
-    async def send(self, chat_id: Union[str, int]) -> AiogramMessage:
+        raise ValueError("Can't detect `send_method`. Specify it explicitly.")
+
+    async def send(self, chat_id: Union[str, int]) -> AiogramMessage:  # type: ignore
         return await self.send_method(chat_id=chat_id, **self.message_kwargs)
 
 

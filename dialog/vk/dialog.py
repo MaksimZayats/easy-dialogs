@@ -51,7 +51,7 @@ class FiltersGroup(bases.BaseFiltersGroup):
     def default_event_types(self) -> Tuple[str]:
         return EventType.MESSAGE,
 
-    def init(self, bot: Optional[Bot] = None):
+    def init(self, bot: Optional[Bot] = None) -> None:  # type: ignore
         bot = bot or get_current_bot()
 
         for event in self.event_types:
@@ -66,7 +66,7 @@ class Scene(bases.BaseScene):
     filters: 'FiltersGroup'
     relations: Tuple['Relation', ...]
 
-    def init(self, bot: Bot) -> None:
+    def init(self, bot: Bot) -> None:  # type: ignore
         for relation in self.relations:
             relation.init_scene(namespace=self.namespace)
             relation.filters.init(bot=bot)
@@ -90,7 +90,7 @@ class Relation(bases.BaseRelation):
 class Router(bases.BaseRouter):
     relations: Tuple[Relation, ...]
 
-    def init(self, bot: Bot):
+    def init(self, bot: Bot) -> None:  # type: ignore
         for relation in self.relations:
             relation.init_scene(namespace=self.namespace)
             relation.filters.init(bot=bot)
@@ -98,7 +98,7 @@ class Router(bases.BaseRouter):
 
 class Dialog(bases.BaseDialog):
     @classmethod
-    def register_handlers(cls,
+    def register_handlers(cls,  # type: ignore
                           bot: Bot,
                           scenes_storage: Optional[bases.BaseScenesStorage] = None,
                           handler: Type[bases.BaseHandler] = Handler):
@@ -115,7 +115,7 @@ class Dialog(bases.BaseDialog):
         )
 
     @classmethod
-    def init(cls, bot: Bot):
+    def init(cls, bot: Bot):  # type: ignore
         for scene in cls.initialized_scenes.values():
             scene.init(bot=bot)
 

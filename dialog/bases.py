@@ -1,7 +1,7 @@
 from abc import ABC, ABCMeta, abstractmethod
 from copy import deepcopy
-from typing import (Any, AsyncIterator, Awaitable, Callable, Dict, Iterable, List, Optional, Sequence, Set,
-                    Tuple, Type, Union)
+from typing import (Any, AsyncIterator, Awaitable, Callable, Dict, Iterable,
+                    List, Optional, Sequence, Set, Tuple, Type, Union)
 
 from dialog.shared.types import FutureScene
 from dialog.shared.utils import run_function
@@ -147,16 +147,16 @@ class BaseScene(ABC):
         :param can_stay: If `False`, then this scene cannot be set as the current scene.
         :param custom_kwargs:
         """
-        self.name = name  # Will be updated by `DialogMeta`
-        self.namespace = namespace  # Will be updated by `DialogMeta`
+        self.name: str = name  # type: ignore  # If `None` will be updated by `DialogMeta`
+        self.namespace: str = namespace  # type: ignore  # If `None` will be updated by `DialogMeta`
 
-        if not isinstance(messages, Iterable):
-            messages = (messages,)
-        if not isinstance(relations, Iterable):
+        if not isinstance(messages, Sequence):
+            messages = (messages,)  # type: ignore
+        if not isinstance(relations, Sequence):
             relations = (relations,)
-        if not isinstance(on_pre_view, Iterable):
+        if not isinstance(on_pre_view, Sequence):
             on_pre_view = (on_pre_view,)
-        if not isinstance(on_post_view, Iterable):
+        if not isinstance(on_post_view, Sequence):
             on_post_view = (on_post_view,)
         if not isinstance(on_enter, Iterable):
             on_enter = (on_enter,)
@@ -172,7 +172,7 @@ class BaseScene(ABC):
         view_function = self._pre_view(view_function)
         view_function = self._post_view(view_function)
         self.view = view_function
-        self.view.__wrapped__ = _view_function
+        setattr(self.view, '__wrapped__', _view_function)
 
         self.on_pre_view = on_pre_view
         self.on_post_view = on_post_view
@@ -198,12 +198,12 @@ class BaseScene(ABC):
         pass
 
     async def get_messages(self, *args, **kwargs) -> AsyncIterator[BaseMessage]:
-        for message in self.messages:
+        for message in self.messages:  # type: ignore
             if isinstance(message, BaseMessage):
                 yield message
-            elif isinstance(message, Callable):
+            elif callable(message):
                 messages: Union[BaseMessage, Sequence[BaseMessage]] = \
-                    await run_function(message, *args, **kwargs)
+                    await run_function(message, *args, **kwargs)  # type: ignore
 
                 if isinstance(messages, BaseMessage):
                     yield messages
@@ -266,7 +266,7 @@ class BaseScenesStorage(ABC):
     async def update_scenes_history(self, *,
                                     chat_id: Union[int, str],
                                     user_id: Union[int, str],
-                                    new_scenes_history: Sequence[str]) -> List[str]:
+                                    new_scenes_history: Sequence[str]) -> Sequence[str]:
         """
         :returns: Scenes History
         """
@@ -391,7 +391,7 @@ class BaseRelation(ABC):
             self.to_scene_name = to
             self.get_scene_func = None  # type: ignore
             self.future_scene = None  # type: ignore
-        elif isinstance(to, Callable):
+        elif callable(to):
             self.to_scene = None  # type: ignore
             self.to_scene_name = None  # type: ignore
             self.get_scene_func = to
@@ -400,7 +400,7 @@ class BaseRelation(ABC):
         if isinstance(event_types, str):
             event_types = (event_types,)
 
-        if isinstance(on_transition, Callable):
+        if callable(on_transition):
             on_transition = (on_transition,)
 
         self.on_transition = on_transition
@@ -462,7 +462,7 @@ class BaseRelation(ABC):
 class BaseRouter(ABC):
     def __init__(self, *relations: 'BaseRelation', namespace: Optional[str] = None):
         self.relations = relations
-        self.namespace = namespace  # Will be updated by `DialogMeta`
+        self.namespace: str = namespace  # type: ignore  # If `None` will be updated by `DialogMeta`
 
     def register(self):
         if self.namespace is None:

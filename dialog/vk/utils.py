@@ -2,7 +2,7 @@ from contextvars import ContextVar
 
 from vkbottle import Bot
 
-_bot = ContextVar('bot')
+_bot: ContextVar[Bot] = ContextVar('bot')
 
 
 def get_current_bot() -> Bot:

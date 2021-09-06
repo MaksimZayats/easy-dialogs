@@ -31,7 +31,7 @@ class View:
             except AttributeError:
                 chat_id = user_id
 
-        scene: 'Scene' = kwargs.get(Dialog.KEY_FOR_CURRENT_SCENES)
+        scene: 'Scene' = kwargs.get(Dialog.KEY_FOR_CURRENT_SCENES)  # type: ignore
 
         async for message_to_send in scene.get_messages(*args, **kwargs):
             sent_message = await message_to_send.send(chat_id=chat_id)
@@ -76,7 +76,7 @@ class FiltersGroup(bases.BaseFiltersGroup):
     def default_event_types(self) -> Tuple[str]:
         return EventType.MESSAGE,
 
-    def init(self, dp: Optional[Dispatcher] = None):
+    def init(self, dp: Optional[Dispatcher] = None):  # type: ignore
         dp = dp or Dispatcher.get_current()
 
         for event in self.event_types:
@@ -100,7 +100,7 @@ class Scene(bases.BaseScene):
     filters: FiltersGroup
     relations: Tuple['Relation', ...]
 
-    def init(self, dp: Optional[Dispatcher] = None) -> None:
+    def init(self, dp: Optional[Dispatcher] = None) -> None:  # type: ignore
         for relation in self.relations:
             relation.init_scene(namespace=self.namespace)
             relation.filters.init(dp=dp)
@@ -124,7 +124,7 @@ class Relation(bases.BaseRelation):
 class Router(bases.BaseRouter):
     relations: Tuple[Relation, ...]
 
-    def init(self, dp: Optional[Dispatcher] = None):
+    def init(self, dp: Optional[Dispatcher] = None):  # type: ignore
         for relation in self.relations:
             relation.init_scene(namespace=self.namespace)
             relation.filters.init(dp=dp)
@@ -132,7 +132,7 @@ class Router(bases.BaseRouter):
 
 class Dialog(bases.BaseDialog):
     @classmethod
-    def register_handlers(cls,
+    def register_handlers(cls,  # type: ignore
                           dp: Dispatcher,
                           scenes_storage: Optional[bases.BaseScenesStorage] = None,
                           handler: Type[bases.BaseHandler] = Handler):
@@ -154,7 +154,7 @@ class Dialog(bases.BaseDialog):
         # TODO: register all Events
 
     @classmethod
-    def init(cls, dp: Optional[Dispatcher] = None):
+    def init(cls, dp: Optional[Dispatcher] = None):  # type: ignore
         for scene in cls.initialized_scenes.values():
             scene.init(dp=dp)
 
