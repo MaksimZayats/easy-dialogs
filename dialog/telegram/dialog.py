@@ -2,7 +2,7 @@ from typing import Callable, List, Optional, Tuple, Type, Union
 
 from aiogram import Dispatcher
 from aiogram.dispatcher.handler import SkipHandler
-from aiogram.types import CallbackQuery
+from aiogram.types import CallbackQuery, ContentType
 from aiogram.types import Message as AiogramMessage
 from aiogram.types.base import TelegramObject
 
@@ -139,7 +139,10 @@ class Dialog(bases.BaseDialog):
         cls.scenes_storage = scenes_storage or AiogramBasedScenesStorage(storage=dp.storage)
         cls.init(dp)
 
-        dp.register_message_handler(handler(dialog=cls, event_type=EventType.MESSAGE))
+        dp.register_message_handler(
+            handler(dialog=cls, event_type=EventType.MESSAGE),
+            content_types=ContentType.ANY
+        )
         dp.register_callback_query_handler(handler(dialog=cls, event_type=EventType.CALLBACK_QUERY))
         dp.register_poll_handler(handler(dialog=cls, event_type=EventType.POLL))
         dp.register_poll_answer_handler(handler(dialog=cls, event_type=EventType.POLL_ANSWER))
