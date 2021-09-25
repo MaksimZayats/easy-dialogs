@@ -54,7 +54,7 @@ class SimpleMessage(bases.BaseMessage):
                     if attach_method is None:
                         raise ValueError(f'Cant attach "{self.attachment_type}" to media group')
 
-                    if is_url(self.attachments[0]):
+                    if isinstance(self.attachments[0], str) and is_url(self.attachments[0]):
                         attach_method(InputFile.from_url(url=self.attachments[0]), self.text)
                     else:
                         attach_method(InputFile(path_or_bytesio=self.attachments[0]), self.text)
