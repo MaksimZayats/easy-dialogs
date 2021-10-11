@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from functools import cached_property
+from io import BytesIO
 from typing import Callable, List, Optional, Sequence, Tuple, Union
 
 from aiogram import Bot
@@ -16,7 +17,7 @@ class SimpleMessage(bases.BaseMessage):
     text: Optional[str] = None
 
     attachment_type: Optional[str] = None
-    attachments: Optional[Sequence[str]] = None
+    attachments: Optional[Sequence[Union[str, BytesIO]]] = None
 
     keyboard: Optional[Union[ReplyKeyboardMarkup, InlineKeyboardMarkup, ReplyKeyboardRemove]] = None
 
@@ -24,27 +25,26 @@ class SimpleMessage(bases.BaseMessage):
         self._default_messages = self._convert_to_default_message()
 
     def _convert_to_default_message(self) -> Tuple['Message', ...]:
-        custom_messages: List[Message] = []
+        default_messages: List[Message] = []
 
         if self.attachment_type and self.attachments:
             if len(self.attachments) > 1:
                 if self.attachment_type == AttachmentType.STICKER:
                     if self.text:
-                        custom_messages.append(Message(text=self.text))
+                        default_messages.append(Message(text=self.text))
 
                     for attachment in self.attachments[:-1]:
-                        custom_messages.append(Message(sticker=attachment))
+                        default_messages.append(Message(sticker=attachment))
 
-                    custom_messages.append(Message(sticker=self.attachments[-1],
-                                                   reply_markup=self.keyboard))
-
+                    default_messages.append(Message(sticker=self.attachments[-1],
+                                                    reply_markup=self.keyboard))
                 elif self.attachment_type == AttachmentType.ANIMATION:
                     for attachment in self.attachments[:-1]:
-                        custom_messages.append(Message(animation=attachment))
+                        default_messages.append(Message(animation=attachment))
 
-                    custom_messages.append(Message(animation=self.attachments[-1],
-                                                   caption=self.text,
-                                                   reply_markup=self.keyboard))
+                    default_messages.append(Message(animation=self.attachments[-1],
+                                                    caption=self.text,
+                                                    reply_markup=self.keyboard))
                 else:
                     """If attachments > 1: media group"""
                     media_group = MediaGroup()
@@ -60,29 +60,28 @@ class SimpleMessage(bases.BaseMessage):
                         attach_method(InputFile(path_or_bytesio=self.attachments[0]), self.text)
 
                     for attachment in self.attachments[1:]:
-                        if is_url(attachment):
+                        if is_url(attachment):  # type: ignore  # TODO: change type
                             attach_method(InputFile.from_url(url=attachment))
                         else:
                             attach_method(InputFile(path_or_bytesio=attachment))
 
-                    custom_messages.append(Message(media=media_group))
-
+                    default_messages.append(Message(media=media_group))
             else:
                 if self.attachment_type == AttachmentType.STICKER:
                     if self.text:
-                        custom_messages.append(Message(text=self.text))
+                        default_messages.append(Message(text=self.text))
 
-                    custom_messages.append(Message(sticker=self.attachments[0],
-                                                   reply_markup=self.keyboard))
+                    default_messages.append(Message(sticker=self.attachments[0],
+                                                    reply_markup=self.keyboard))
                 else:
-                    custom_messages.append(
+                    default_messages.append(
                         Message(**{self.attachment_type.lower(): self.attachments[0]},  # type: ignore
                                 caption=self.text,
                                 reply_markup=self.keyboard))
         else:
-            custom_messages.append(Message(text=self.text, reply_markup=self.keyboard))
+            default_messages.append(Message(text=self.text, reply_markup=self.keyboard))
 
-        return tuple(custom_messages)
+        return tuple(default_messages)
 
     async def send(self, chat_id: Union[int, str]) -> List[AiogramMessage]:  # type: ignore
         sent_messages: List[AiogramMessage] = []
