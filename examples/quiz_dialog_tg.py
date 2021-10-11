@@ -15,7 +15,6 @@ from dialog.shared.types import FutureDialog
 from dialog.telegram import Dialog, Relation, Router, Scene
 from dialog.telegram.types import SimpleMessage
 
-
 logging.basicConfig(level=logging.INFO)
 
 

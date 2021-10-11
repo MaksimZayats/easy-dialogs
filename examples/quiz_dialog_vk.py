@@ -13,7 +13,6 @@ from dialog.vk import Dialog, Relation, Router, Scene
 from dialog.vk.middlewares import FSMMiddleware
 from dialog.vk.types import Message
 
-
 logging.basicConfig(level=logging.INFO)
 
 
