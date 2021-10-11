@@ -326,7 +326,8 @@ class BaseScenesStorage(ABC):
                         await run_function(
                             on_transition_function,
                             *handler_args,
-                            **handler_kwargs | {BaseDialog.KEY_FOR_NEXT_SCENES: next_scene}
+                            **handler_kwargs,
+                            **{BaseDialog.KEY_FOR_NEXT_SCENES: next_scene},
                         )
 
                     return next_scene
@@ -349,7 +350,8 @@ class BaseScenesStorage(ABC):
                         await run_function(
                             on_transition_function,
                             *handler_args,
-                            **handler_kwargs | {BaseDialog.KEY_FOR_NEXT_SCENES: next_scene}
+                            **handler_kwargs,
+                            **{BaseDialog.KEY_FOR_NEXT_SCENES: next_scene},
                         )
 
                     return next_scene
