@@ -1,6 +1,6 @@
 import logging
 import os
-from typing import Optional, Type
+from typing import Optional
 
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from aiogram.dispatcher import FSMContext
@@ -8,7 +8,6 @@ from vkbottle import Bot, Keyboard, KeyboardButtonColor, Text
 from vkbottle.bot import Message as VKMessage
 
 from dialog.shared.storage import AiogramBasedScenesStorage
-from dialog.shared.types import FutureDialog
 from dialog.vk import Dialog, Relation, Router, Scene
 from dialog.vk.middlewares import FSMMiddleware
 from dialog.vk.types import Message
@@ -84,20 +83,17 @@ def create_keyboard() -> str:
 
 
 class QuizUtils(Dialog):
-    QuizUtils: Type['QuizUtils'] = FutureDialog('QuizUtils')
-    Questions: Type['Questions'] = FutureDialog('Questions')
-
     router = Router(
         Relation(
-            lambda *, current_scene: current_scene or QuizUtils.start_scene,
+            lambda *, current_scene: current_scene or QuizUtils.start_scene,  # type: ignore
             is_game_not_started,
         ),
         Relation(
-            lambda *, current_scene: current_scene or QuizUtils.start_scene,
+            lambda *, current_scene: current_scene or QuizUtils.start_scene,  # type: ignore
             payload={'action': 'restart'},
         ),
         Relation(
-            QuizUtils.score,
+            'QuizUtils.score',
             is_game_started,
             payload={'action': 'score'}
         ),
@@ -113,11 +109,11 @@ class QuizUtils(Dialog):
             on_transition=process_move_to_previous_scene,
         ),
         Relation(
-            QuizUtils.incorrect_answer,
+            'QuizUtils.incorrect_answer',
             is_game_started
         ),
         Relation(
-            QuizUtils.game_is_not_started_scene,
+            'QuizUtils.game_is_not_started_scene',
             is_game_not_started
         ),
     )
@@ -131,13 +127,13 @@ class QuizUtils(Dialog):
     start_scene = Scene(
         messages=lambda msg: Message(message='Приветствуем в игре!',
                                      keyboard=create_keyboard()),
-        relations=Relation(Questions.q1, lambda: True),
+        relations=Relation('Questions.q1', lambda: True),
         is_transitional_scene=True,
     )
 
     end_scene = Scene(
         messages=get_end_game_message,
-        relations=Relation(QuizUtils.end_scene, lambda: True),
+        relations=Relation('QuizUtils.end_scene', lambda: True),
     )
 
     score = Scene(messages=get_score_message, can_stay=False)
@@ -145,18 +141,16 @@ class QuizUtils(Dialog):
 
 
 class Questions(Dialog):
-    Questions: Type['Questions'] = FutureDialog('Questions')
-
     q1 = Scene(
         messages=Message(message='Вопрос 1:\n2 + 2 = ?'),
-        relations=Relation(Questions.q2, text=['4', 'Четыре'],
+        relations=Relation('Questions.q2', text=['4', 'Четыре'],
                            on_transition=process_correct_answer),
     )
 
     q2 = Scene(
         messages=Message(message='Вопрос 2:\n3 + 3 = ?'),
         relations=Relation(
-            Questions.q3,
+            'Questions.q3',
             text=['6', 'Шесть', 'Six'],
             on_transition=process_correct_answer,
         ),

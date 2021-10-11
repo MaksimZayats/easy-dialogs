@@ -1,7 +1,7 @@
 import asyncio
 import logging
 import os
-from typing import Optional, Type
+from typing import Optional
 
 from aiogram import Bot, Dispatcher
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
@@ -11,7 +11,6 @@ from aiogram.types import Message as AiogramMessage
 from aiogram.types import ReplyKeyboardRemove
 
 from dialog.shared.storage import AiogramBasedScenesStorage
-from dialog.shared.types import FutureDialog
 from dialog.telegram import Dialog, Relation, Router, Scene
 from dialog.telegram.types import SimpleMessage
 
@@ -83,16 +82,13 @@ async def get_score_message(message: AiogramMessage,
 
 
 class QuizUtils(Dialog):
-    QuizUtils: Type['QuizUtils'] = FutureDialog('QuizUtils')
-    Questions: Type['Questions'] = FutureDialog('Questions')
-
     router = Router(
         Relation(
-            lambda *, current_scene: current_scene or QuizUtils.start_scene,
+            lambda *, current_scene: current_scene or QuizUtils.start_scene,  # type: ignore
             commands='start',
         ),
         Relation(
-            QuizUtils.score,
+            'QuizUtils.score',
             is_game_started,
             commands='score'
         ),
@@ -108,11 +104,11 @@ class QuizUtils(Dialog):
             on_transition=process_move_to_previous_scene,
         ),
         Relation(
-            QuizUtils.incorrect_answer,
+            'QuizUtils.incorrect_answer',
             is_game_started
         ),
         Relation(
-            QuizUtils.game_is_not_started_scene,
+            'QuizUtils.game_is_not_started_scene',
             is_game_not_started
         ),
     )
@@ -137,13 +133,13 @@ class QuizUtils(Dialog):
             text=f'Welcome to the game, <b>{msg.from_user.first_name}</b>!',
             keyboard=ReplyKeyboardRemove(),
         ),
-        relations=Relation(Questions.q1, lambda: True),
+        relations=Relation('Questions.q1', lambda: True),
         is_transitional_scene=True,
     )
 
     end_scene = Scene(
         messages=get_end_game_message,
-        relations=Relation(QuizUtils.end_scene, lambda: True),
+        relations=Relation('QuizUtils.end_scene', lambda: True),
     )
 
     score = Scene(messages=get_score_message, can_stay=False)
@@ -151,14 +147,12 @@ class QuizUtils(Dialog):
 
 
 class Questions(Dialog):
-    Questions: Type['Questions'] = FutureDialog('Questions')
-
     q1 = Scene(
         messages=lambda msg: SimpleMessage(text='<i>Вопрос 1:\n</i>2 + 2 = ?')
         if msg.from_user.language_code == 'ru'
         else SimpleMessage(text='<i>Question 1:\n</i>2 + 2 = ?'),
         relations=Relation(
-            Questions.q2,
+            'Questions.q2',
             text=('4', 'Четыре', 'Four'),
             on_transition=process_correct_answer,
         ),
@@ -169,7 +163,7 @@ class Questions(Dialog):
         if msg.from_user.language_code == 'ru'
         else SimpleMessage(text='<i>Question 2:\n</i>3 + 3 = ?'),
         relations=Relation(
-            Questions.q3,
+            'Questions.q3',
             text=('6', 'Шесть', 'Six'),
             on_transition=process_correct_answer,
         ),
